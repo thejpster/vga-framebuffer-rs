@@ -25,9 +25,11 @@ impl vga_framebuffer::Hardware for Dummy {
         for word in &pixels.words {
             for bit in (0..16).rev() {
                 if word & (1 << bit) != 0 {
-                    print!("XX");
+                    // FULL BLOCK
+                    print!("\u{2588}\u{2588}");
                 } else {
-                    print!("..");
+                    // LIGHT SHADE
+                    print!("\u{2591}\u{2591}");
                 }
             }
         }
@@ -37,7 +39,7 @@ impl vga_framebuffer::Hardware for Dummy {
 
 fn main() {
     let mut d = Dummy {};
-    let mut fb = vga_framebuffer::FrameBuffer::new();
+    let mut fb = Box::new(vga_framebuffer::FrameBuffer::new());
     fb.init(&mut d);
     fb.clear();
     fb.hollow_rectangle(
