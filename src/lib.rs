@@ -74,25 +74,23 @@ pub struct VideoLine {
 }
 
 /// The main structure.
-pub struct FrameBuffer<'a, T>
+pub struct FrameBuffer<T>
 where
     T: Hardware,
-    T: 'a,
 {
     line_no: usize,
     fb_line: Option<usize>,
     frame: usize,
     buffer: [VideoLine; VISIBLE_LINES],
-    hw: Option<&'a mut T>,
+    hw: Option<T>,
 }
 
-impl<'a, T> FrameBuffer<'a, T>
+impl<T> FrameBuffer<T>
 where
     T: Hardware,
-    T: 'a,
 {
     /// Create a new FrameBuffer
-    pub fn new() -> FrameBuffer<'a, T> {
+    pub fn new() -> FrameBuffer<T> {
         FrameBuffer {
             line_no: 0,
             fb_line: None,
@@ -102,7 +100,7 @@ where
         }
     }
 
-    pub fn init(&mut self, hw: &'a mut T) {
+    pub fn init(&mut self, mut hw: T) {
         hw.configure(
             H_WHOLE_LINE,
             H_SYNC_PULSE,

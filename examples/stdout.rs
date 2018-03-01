@@ -2,7 +2,7 @@ extern crate vga_framebuffer;
 
 struct Dummy;
 
-impl vga_framebuffer::Hardware for Dummy {
+impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
     fn configure(&mut self, width: u32, sync_end: u32, line_start: u32, clock_rate: u32) {
         println!(
             "width={}, sync_end={}, line_start={}, clock_rate={}",
