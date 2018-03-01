@@ -36,16 +36,17 @@ pub trait Hardware {
     /// have a clock that runs at half the given rate, then double the given
     /// values.
     ///
-    /// H-Sync must rise at start of loop and fall after `sync_end` VGA pixels.
-    /// The function `isr_sync` must also be called when this timer expires
-    /// (after the H-sync pin has been set).
+    /// The function `isr_sync` must be called at the start of the loop.
+    ///
+    /// The H-Sync pin must rise at start of loop and fall after `sync_end`
+    /// VGA pixels.
     ///
     /// The function `isr_data` must be called when the `line_start` period
     /// expires. This will trigger the `write_pixels` function with the pixel
     /// data for the line. Note that these pixels must each be displayed twice
     /// as the framebuffer is half the width and half the height of the VGA
-    /// output. You may need to subtract a small amount from `line_start` to account
-    /// for your ISR latency.
+    /// output. You may need to subtract a small amount from `line_start` to
+    /// account for your ISR latency.
     ///
     /// * width - length of a line (in 80 MHz pixels)
     /// * sync_end - elapsed time (in 80 MHz pixels) before H-Sync needs to fall
