@@ -1,5 +1,6 @@
 //! VGA Frame Buffer for Embedded Microcontrollers
 #![no_std]
+#![feature(const_fn)]
 
 extern crate bresenham;
 
@@ -36,7 +37,7 @@ pub trait Hardware {
     /// have a clock that runs at half the given rate, then double the given
     /// values.
     ///
-    /// The function `isr_sync` must be called at the start of the loop.
+    /// The function `isr_sol` must be called at the start of the loop.
     ///
     /// The H-Sync pin must rise at start of loop and fall after `sync_end`
     /// VGA pixels.
@@ -85,17 +86,18 @@ where
     hw: Option<T>,
 }
 
+
 impl<T> FrameBuffer<T>
 where
     T: Hardware,
 {
     /// Create a new FrameBuffer
-    pub fn new() -> FrameBuffer<T> {
+    pub const fn new() -> FrameBuffer<T> {
         FrameBuffer {
             line_no: 0,
             fb_line: None,
             frame: 0,
-            buffer: [VideoLine::default(); VISIBLE_LINES],
+            buffer: [VideoLine { words: [0u16; HORIZONTAL_WORDS]}; VISIBLE_LINES],
             hw: None,
         }
     }
@@ -110,7 +112,7 @@ where
         self.hw = Some(hw);
     }
 
-    pub fn isr_sync(&mut self) {
+    pub fn isr_sol(&mut self) {
         self.line_no += 1;
 
         if self.line_no == V_WHOLE_FRAME {

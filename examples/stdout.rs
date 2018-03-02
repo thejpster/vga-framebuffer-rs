@@ -58,7 +58,7 @@ fn main() {
         true,
     );
     for _ in 0..628 {
-        fb.isr_sync();
+        fb.isr_sol();
         fb.isr_data();
     }
 }
