@@ -4,6 +4,10 @@
 
 extern crate bresenham;
 
+mod font;
+
+use font::*;
+
 const H_VISIBLE_AREA: u32 = 800;
 const H_FRONT_PORCH: u32 = 40;
 const H_SYNC_PULSE: u32 = 128;
@@ -27,6 +31,16 @@ pub const VISIBLE_COLS: usize = 400;
 pub const MAX_X: usize = VISIBLE_COLS - 1;
 /// How many 16-bit words in a line
 pub const HORIZONTAL_WORDS: usize = (VISIBLE_COLS + BITS_PER_WORD - 1) / BITS_PER_WORD;
+
+/// How many characters in a line
+pub const TEXT_NUM_COLS: usize = VISIBLE_COLS / FONT_WIDTH;
+/// Highest X co-ord for text
+pub const TEXT_MAX_COL: usize = TEXT_NUM_COLS - 1;
+/// How many lines of characters on the screen
+pub const TEXT_NUM_ROWS: usize = VISIBLE_LINES / FONT_HEIGHT;
+/// Highest Y co-ord for text
+pub const TEXT_MAX_ROW: usize = TEXT_NUM_ROWS - 1;
+
 
 /// Implement this on your microcontroller's timer object.
 pub trait Hardware {
@@ -74,7 +88,11 @@ pub struct VideoLine {
     pub words: [u16; HORIZONTAL_WORDS],
 }
 
-/// The main structure.
+/// This structure represents the framebuffer - a 2D array of monochome pixels.
+///
+/// The framebuffer is stored as an array of horizontal lines, where each line
+/// is comprised of 16 bit words. This suits the SPI peripheral on an LM4F120
+/// which can emit 16 bits at a time.
 pub struct FrameBuffer<T>
 where
     T: Hardware,
@@ -84,6 +102,16 @@ where
     frame: usize,
     buffer: [VideoLine; VISIBLE_LINES],
     hw: Option<T>,
+}
+
+/// A `TextFrameBuffer` allows you to write text to a frame buffer.
+///
+/// It tracks the current row and column so that repeated print statements
+/// work as expected.
+pub struct TextFrameBuffer<'a, T> where T: Hardware, T: 'a {
+    col: usize,
+    row: usize,
+    fb: &'a mut FrameBuffer<T>,
 }
 
 
@@ -233,9 +261,110 @@ where
         }
     }
 
+    /// Writes 8 pixels to the framebuffer together.
+    /// The offset is given in u8s.
+    pub fn draw_u8(&mut self, pixels: u8, offset_u8s: usize, y: usize) {
+        let x_word = offset_u8s / 2;
+        let mut bits = self.buffer[y].words[x_word];
+        if (offset_u8s & 1) == 1 {
+            // second u8 in u16
+            bits &= 0xFF00;
+            bits |= pixels as u16;
+        } else {
+            // first u8 in u16
+            bits &= 0x00FF;
+            bits |= (pixels as u16) << 8;
+        }
+        self.buffer[y].words[x_word] = bits;
+    }
+
+    /// Writes 16 pixels to the framebuffer together.
+    /// The offset is given in u16s.
+    pub fn draw_u16(&mut self, pixels: u16, offset_u16s: usize, y: usize) {
+        self.buffer[y].words[offset_u16s] = pixels;
+    }
+
     pub fn clear(&mut self) {
         unsafe {
             core::ptr::write_bytes(self.buffer.as_mut_ptr(), 0x00, VISIBLE_LINES);
         }
     }
 }
+
+impl<'a, T> core::ops::Deref for TextFrameBuffer<'a, T> where T: Hardware {
+    type Target = FrameBuffer<T>;
+
+    fn deref(&self) -> &FrameBuffer<T> {
+        self.fb
+    }
+}
+
+impl<'a, T> core::ops::DerefMut for TextFrameBuffer<'a, T>  where T: Hardware{
+    fn deref_mut(&mut self) -> &mut FrameBuffer<T> {
+        self.fb
+    }
+}
+
+impl<'a, T> TextFrameBuffer<'a, T> where T: Hardware {
+    pub fn new(fb: &'a mut FrameBuffer<T>) -> TextFrameBuffer<'a, T> {
+        TextFrameBuffer { col: 0, row: 0, fb }
+    }
+
+    pub fn write_char_at(&mut self, ch: char, col: usize, row: usize, flip: bool) {
+        if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
+            let pixel_y = row * FONT_HEIGHT;
+            let glyph = Glyph::map_char(ch);
+            for row in 0..FONT_HEIGHT {
+                let mut font_byte = glyph.pixels(row);
+                if flip {
+                    font_byte = !font_byte;
+                }
+                self.fb.draw_u8(font_byte, col, pixel_y + row);
+            }
+        }
+    }
+}
+
+impl<'a, T> core::fmt::Write for TextFrameBuffer<'a, T> where T: Hardware {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        for ch in s.chars() {
+            match ch {
+                '\n' => {
+                    self.col = 0;
+                    self.row += 1;
+                }
+                '\r' => {
+                    self.col = 0;
+                }
+                '\t' => {
+                    let tabs = self.col / 9;
+                    self.col = (tabs + 1) * 9;
+                }
+                ch => {
+                    let col = self.col;
+                    let row = self.row;
+                    self.write_char_at(ch, col, row, false);
+                    self.col += 1;
+                }
+            }
+            if self.col == TEXT_NUM_COLS {
+                self.col = 0;
+                self.row += 1;
+            }
+            if self.row == TEXT_NUM_ROWS {
+                // Should really scroll screen here...
+                self.row = TEXT_NUM_ROWS - 1;
+                for line in 0..VISIBLE_LINES - FONT_HEIGHT {
+                    self.fb.buffer[line] = self.fb.buffer[line + FONT_HEIGHT];
+                }
+                for line in VISIBLE_LINES - FONT_HEIGHT..VISIBLE_LINES {
+                    self.fb.buffer[line] = VideoLine { words: [0u16; HORIZONTAL_WORDS] };
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+
+// End of file
