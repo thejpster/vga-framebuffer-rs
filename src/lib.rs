@@ -51,7 +51,6 @@ pub const TEXT_NUM_ROWS: usize = VISIBLE_LINES / FONT_HEIGHT;
 /// Highest Y co-ord for text
 pub const TEXT_MAX_ROW: usize = TEXT_NUM_ROWS - 1;
 
-
 /// Implement this on your microcontroller's timer object.
 pub trait Hardware {
     /// Called at start-up to configure timer.
@@ -84,13 +83,16 @@ pub trait Hardware {
     /// Called when V-Sync needs to be low.
     fn vsync_off(&mut self);
 
-    /// Called when pixels need to be written to the output pin.
+    /// Called at start of line, allowing pixels to be loaded into a buffer.
+    fn buffer_pixels(&mut self, pixels: &VideoLine);
+
+    /// Called when pixels actually need to be written to the output pin.
     fn write_pixels(&mut self, pixels: &VideoLine);
 }
 
 /// A point on the screen.
 /// The arguments are X (column), Y (row)
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Point(pub usize, pub usize);
 
 #[derive(Default, Copy, Clone)]
@@ -118,12 +120,15 @@ where
 ///
 /// It tracks the current row and column so that repeated print statements
 /// work as expected.
-pub struct TextFrameBuffer<'a, T> where T: Hardware, T: 'a {
+pub struct TextFrameBuffer<'a, T>
+where
+    T: Hardware,
+    T: 'a,
+{
     col: usize,
     row: usize,
     fb: &'a mut FrameBuffer<T>,
 }
-
 
 impl<T> FrameBuffer<T>
 where
@@ -135,7 +140,9 @@ where
             line_no: 0,
             fb_line: None,
             frame: 0,
-            buffer: [VideoLine { words: [0u16; HORIZONTAL_WORDS]}; VISIBLE_LINES],
+            buffer: [VideoLine {
+                words: [0u16; HORIZONTAL_WORDS],
+            }; VISIBLE_LINES],
             hw: None,
         }
     }
@@ -171,9 +178,15 @@ where
         {
             // Visible lines
             // 600 visible lines, 300 output lines each shown twice
-            self.fb_line = Some((self.line_no - (V_SYNC_PULSE + V_BACK_PORCH)) >> 1);
+            let line = (self.line_no - (V_SYNC_PULSE + V_BACK_PORCH)) >> 1;
+            if let Some(ref mut hw) = self.hw {
+                hw.buffer_pixels(&self.buffer[line]);
+            }
+            self.fb_line = Some(line);
         } else if self.line_no == V_SYNC_PULSE + V_BACK_PORCH + V_VISIBLE_AREA {
+            // End of visible frame - increment counter
             self.frame = self.frame.wrapping_add(1);
+            self.fb_line = None;
         } else {
             // Front porch
             self.fb_line = None;
@@ -204,6 +217,26 @@ where
             self.buffer[y].words[word_x] |= 1 << word_x_offset;
         } else {
             self.buffer[y].words[word_x] &= !(1 << word_x_offset);
+        }
+    }
+
+    /// Draw a bitmap
+    pub fn draw_bitmap(&mut self, top_left: Point, width: usize, data: &[u8]) {
+        let height = (data.len() * 8) / width;
+        let mut byte_idx = 0;
+        let mut bit_idx = 7;
+        for row in 0..height {
+            for col in 0..width {
+                let bit: bool = (data[byte_idx] & (1 << bit_idx)) != 0;
+                if bit_idx == 0 {
+                    bit_idx = 7;
+                    byte_idx += 1;
+                } else {
+                    bit_idx -= 1;
+                }
+                let point = Point(col + top_left.0, row + top_left.1);
+                self.draw_point(point, bit);
+            }
         }
     }
 
@@ -301,7 +334,10 @@ where
     }
 }
 
-impl<'a, T> core::ops::Deref for TextFrameBuffer<'a, T> where T: Hardware {
+impl<'a, T> core::ops::Deref for TextFrameBuffer<'a, T>
+where
+    T: Hardware,
+{
     type Target = FrameBuffer<T>;
 
     fn deref(&self) -> &FrameBuffer<T> {
@@ -309,13 +345,19 @@ impl<'a, T> core::ops::Deref for TextFrameBuffer<'a, T> where T: Hardware {
     }
 }
 
-impl<'a, T> core::ops::DerefMut for TextFrameBuffer<'a, T>  where T: Hardware{
+impl<'a, T> core::ops::DerefMut for TextFrameBuffer<'a, T>
+where
+    T: Hardware,
+{
     fn deref_mut(&mut self) -> &mut FrameBuffer<T> {
         self.fb
     }
 }
 
-impl<'a, T> TextFrameBuffer<'a, T> where T: Hardware {
+impl<'a, T> TextFrameBuffer<'a, T>
+where
+    T: Hardware,
+{
     pub fn new(fb: &'a mut FrameBuffer<T>) -> TextFrameBuffer<'a, T> {
         TextFrameBuffer { col: 0, row: 0, fb }
     }
@@ -333,9 +375,24 @@ impl<'a, T> TextFrameBuffer<'a, T> where T: Hardware {
             }
         }
     }
+
+    /// Returns Ok(()) if dimensions are OK, or Err(()) if they are out of
+    /// range.
+    pub fn goto(&mut self, col: usize, row: usize) -> Result<(), ()> {
+        if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
+            self.col = col;
+            self.row = row;
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
 }
 
-impl<'a, T> core::fmt::Write for TextFrameBuffer<'a, T> where T: Hardware {
+impl<'a, T> core::fmt::Write for TextFrameBuffer<'a, T>
+where
+    T: Hardware,
+{
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         for ch in s.chars() {
             match ch {
@@ -368,13 +425,14 @@ impl<'a, T> core::fmt::Write for TextFrameBuffer<'a, T> where T: Hardware {
                     self.fb.buffer[line] = self.fb.buffer[line + FONT_HEIGHT];
                 }
                 for line in VISIBLE_LINES - FONT_HEIGHT..VISIBLE_LINES {
-                    self.fb.buffer[line] = VideoLine { words: [0u16; HORIZONTAL_WORDS] };
+                    self.fb.buffer[line] = VideoLine {
+                        words: [0u16; HORIZONTAL_WORDS],
+                    };
                 }
             }
         }
         Ok(())
     }
 }
-
 
 // End of file

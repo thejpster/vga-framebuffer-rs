@@ -20,6 +20,9 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
         println!("vsync_off");
     }
 
+    /// Called when pixels can be buffered for this line.
+    fn buffer_pixels(&mut self, _pixels: &vga_framebuffer::VideoLine) {}
+
     /// Called when pixels need to be written to the output pin.
     fn write_pixels(&mut self, pixels: &vga_framebuffer::VideoLine) {
         for word in &pixels.words {
@@ -61,8 +64,23 @@ fn main() {
     tfb.write_char_at('$', 0, 0, false);
     tfb.write_char_at('$', 0, vga_framebuffer::TEXT_MAX_ROW, false);
     tfb.write_char_at('$', vga_framebuffer::TEXT_MAX_COL, 0, false);
-    tfb.write_char_at('$', vga_framebuffer::TEXT_MAX_COL, vga_framebuffer::TEXT_MAX_ROW, false);
-    writeln!(tfb, "\nThis is a test");
+    tfb.write_char_at(
+        '$',
+        vga_framebuffer::TEXT_MAX_COL,
+        vga_framebuffer::TEXT_MAX_ROW,
+        false,
+    );
+    writeln!(tfb, "\nThis is a test").unwrap();
+    let bitmap: [u8; 8] = [
+        0b00111100, 0b01000010, 0b10100101, 0b10000001, 0b10100101, 0b10011001, 0b01000010,
+        0b00111100,
+    ];
+    for x in 0..10 {
+        for y in 0..10 {
+            let p = vga_framebuffer::Point(100 + x * 10, 100 + y * 10);
+            tfb.draw_bitmap(p, 8, &bitmap);
+        }
+    }
     for _ in 0..628 {
         tfb.isr_sol();
         tfb.isr_data();
