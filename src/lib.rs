@@ -1,4 +1,12 @@
 //! VGA Frame Buffer for Embedded Microcontrollers
+//!
+//! Generates an 800 x 600 @ 60 Hz SVGA signal from a 400 x 300 monochrome
+//! framebuffer.
+//!
+//! Requires pixels to be emitted with a 40 MHz pixel clock.
+//!
+//! See https://github.com/thejpster/monotron for an example.
+
 #![no_std]
 #![feature(const_fn)]
 
@@ -8,6 +16,8 @@ mod font;
 
 use font::*;
 
+// See http://tinyvga.com/vga-timing/800x600@60Hz
+// These values assume a 40 MHz pixel clock
 const H_VISIBLE_AREA: u32 = 800;
 const H_FRONT_PORCH: u32 = 40;
 const H_SYNC_PULSE: u32 = 128;
@@ -18,7 +28,7 @@ const V_FRONT_PORCH: usize = 1;
 const V_SYNC_PULSE: usize = 4;
 const V_BACK_PORCH: usize = 23;
 const V_WHOLE_FRAME: usize = V_SYNC_PULSE + V_BACK_PORCH + V_VISIBLE_AREA + V_FRONT_PORCH;
-const PIXEL_CLOCK: u32 = 80_000_000;
+const PIXEL_CLOCK: u32 = 40_000_000;
 const BITS_PER_WORD: usize = 16;
 
 /// Number of lines in frame buffer
@@ -63,9 +73,9 @@ pub trait Hardware {
     /// output. You may need to subtract a small amount from `line_start` to
     /// account for your ISR latency.
     ///
-    /// * width - length of a line (in 80 MHz pixels)
-    /// * sync_end - elapsed time (in 80 MHz pixels) before H-Sync needs to fall
-    /// * line_start - elapsed time (in 80 MHz pixels) before line_start ISR needs to fire
+    /// * width - length of a line (in 40 MHz pixels)
+    /// * sync_end - elapsed time (in 40 MHz pixels) before H-Sync needs to fall
+    /// * line_start - elapsed time (in 40 MHz pixels) before line_start ISR needs to fire
     fn configure(&mut self, width: u32, sync_end: u32, line_start: u32, clock_rate: u32);
 
     /// Called when V-Sync needs to be high.
