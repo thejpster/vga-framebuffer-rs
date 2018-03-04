@@ -157,6 +157,10 @@ where
         self.hw = Some(hw);
     }
 
+    pub fn frame(&self) -> usize {
+        self.frame
+    }
+
     pub fn isr_sol(&mut self) {
         self.line_no += 1;
 
