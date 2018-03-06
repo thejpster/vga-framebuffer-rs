@@ -103,6 +103,12 @@ pub enum Glyph {
     Tilde,
 }
 
+impl ::core::default::Default for Glyph {
+    fn default() -> Glyph {
+        Glyph::Space
+    }
+}
+
 /// The font data here must be in the same order as the `Glyph` enum.
 pub const FONT_DATA: [u8; 1536] = [
     0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,  // <unknown>

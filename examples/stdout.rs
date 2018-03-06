@@ -44,45 +44,19 @@ fn main() {
     let mut d = Dummy {};
     let mut fb = Box::new(vga_framebuffer::FrameBuffer::new());
     fb.init(&mut d);
-    let mut tfb = vga_framebuffer::TextFrameBuffer::new(&mut fb);
-    tfb.clear();
-    tfb.hollow_rectangle(
-        vga_framebuffer::Point(10, 10),
-        vga_framebuffer::Point(390, 290),
-        true,
-    );
-    tfb.line(
-        vga_framebuffer::Point(10, 10),
-        vga_framebuffer::Point(390, 290),
-        true,
-    );
-    tfb.line(
-        vga_framebuffer::Point(390, 10),
-        vga_framebuffer::Point(10, 290),
-        true,
-    );
-    tfb.write_char_at('$', 0, 0, false);
-    tfb.write_char_at('$', 0, vga_framebuffer::TEXT_MAX_ROW, false);
-    tfb.write_char_at('$', vga_framebuffer::TEXT_MAX_COL, 0, false);
-    tfb.write_char_at(
+    fb.clear();
+    fb.write_char_at('$', 0, 0, false);
+    fb.write_char_at('$', 0, vga_framebuffer::TEXT_MAX_ROW, false);
+    fb.write_char_at('$', vga_framebuffer::TEXT_MAX_COL, 0, false);
+    fb.write_char_at(
         '$',
         vga_framebuffer::TEXT_MAX_COL,
         vga_framebuffer::TEXT_MAX_ROW,
         false,
     );
-    writeln!(tfb, "\nThis is a test").unwrap();
-    let bitmap: [u8; 8] = [
-        0b00111100, 0b01000010, 0b10100101, 0b10000001, 0b10100101, 0b10011001, 0b01000010,
-        0b00111100,
-    ];
-    for x in 0..10 {
-        for y in 0..10 {
-            let p = vga_framebuffer::Point(100 + x * 10, 100 + y * 10);
-            tfb.draw_bitmap(p, 8, &bitmap);
-        }
-    }
+    writeln!(fb, "\nThis is a test").unwrap();
     for _ in 0..628 {
-        tfb.isr_sol();
-        tfb.isr_data();
+        fb.isr_sol();
+        fb.isr_data();
     }
 }
