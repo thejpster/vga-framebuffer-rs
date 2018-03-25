@@ -1,9 +1,39 @@
 //! VGA Frame Buffer for Embedded Microcontrollers
 //!
-//! Generates an 800 x 600 @ 60 Hz SVGA signal from a 400 x 300 monochrome
-//! framebuffer.
+//! Generates an 800 x 600 @ 60 Hz SVGA signal from a 48 column x 36 row
+//! monochrome text buffer. The image has a border.
 //!
-//! Requires pixels to be emitted with a 40 MHz pixel clock.
+//! TODO: Implement smooth scrolling in the vertical direction with an extra
+//! text row.
+//!
+//!
+//! Width = 400 double width pixels => 400 = 8 + (48 x 8) + 8
+//!
+//! Height = 600 pixels => 600 = 12 + (36 x 16) + 12
+//!
+//! ```ignore
+//! <-------------- 400 px, pixel doubled to 800 px ------------->
+//! +------------------------------------------------------------+
+//! |<--> 8 pixel border     ^                8 pixel border <-->|
+//! |                        | 12 px border                      |
+//! |                        v                                   |
+//! |    +--------------------------------------------------+    |
+//! |    | <--^------ 48 chars x 8 px = 384  px ----------->|    |
+//! |    |    |                                             |    |
+//! |    |    |                                             |    |
+//! |    |    | 36 rows x 16 px = 576 px                    |    |
+//! |    |    |                                             |    |
+//! |    |    |                                             |    |
+//! |    |    v                                             |    |
+//! |    +--------------------------------------------------+    |
+//! |                          ^                                 |
+//! |                          | 12 px border                    |
+//! |                          v                                 |
+//! +------------------------------------------------------------+
+//! ```
+//!
+//! Requires pixels to be emitted with a 20 MHz pixel clock (against a nominal
+//! 40 MHz pixel clock, in order to acheive the horizontal doubling).
 //!
 //! See https://github.com/thejpster/monotron for an example.
 
@@ -28,6 +58,19 @@ const V_FRONT_PORCH: usize = 1;
 const V_SYNC_PULSE: usize = 4;
 const V_BACK_PORCH: usize = 23;
 const V_WHOLE_FRAME: usize = V_SYNC_PULSE + V_BACK_PORCH + V_VISIBLE_AREA + V_FRONT_PORCH;
+const V_TOP_BORDER: usize = 12;
+const V_BOTTOM_BORDER: usize = 12;
+
+const V_SYNC_PULSE_FIRST: usize = 0;
+const V_BACK_PORCH_FIRST: usize = V_SYNC_PULSE_FIRST + V_SYNC_PULSE;
+const V_TOP_BORDER_FIRST: usize = V_BACK_PORCH_FIRST + V_BACK_PORCH;
+const V_TOP_BORDER_LAST: usize = V_DATA_FIRST - 1;
+const V_DATA_FIRST: usize = V_TOP_BORDER_FIRST + V_TOP_BORDER;
+const V_DATA_LAST: usize = V_BOTTOM_BORDER_FIRST - 1;
+const V_BOTTOM_BORDER_FIRST: usize = V_DATA_FIRST + (FONT_HEIGHT * TEXT_NUM_ROWS);
+const V_BOTTOM_BORDER_LAST: usize = V_FRONT_PORCH_FIRST - 1;
+const V_FRONT_PORCH_FIRST: usize = V_BOTTOM_BORDER_FIRST + V_BOTTOM_BORDER;
+
 const PIXEL_CLOCK: u32 = 40_000_000;
 const BITS_PER_WORD: usize = 16;
 
@@ -42,12 +85,14 @@ pub const MAX_X: usize = VISIBLE_COLS - 1;
 /// How many 16-bit words in a line
 pub const HORIZONTAL_WORDS: usize = (VISIBLE_COLS + BITS_PER_WORD - 1) / BITS_PER_WORD;
 
-/// How many characters in a line
-pub const TEXT_NUM_COLS: usize = VISIBLE_COLS / FONT_WIDTH;
+/// How many characters in a row
+pub const TEXT_NUM_COLS: usize = 48;
 /// Highest X co-ord for text
 pub const TEXT_MAX_COL: usize = TEXT_NUM_COLS - 1;
-/// How many lines of characters on the screen
-pub const TEXT_NUM_ROWS: usize = VISIBLE_LINES / FONT_HEIGHT;
+/// Number of glyphs in a row, including borders
+pub const TEXT_NUM_COLS_INC_BORDER: usize = TEXT_NUM_COLS + 2;
+/// How many rows of characters on the screen
+pub const TEXT_NUM_ROWS: usize = 36;
 /// Highest Y co-ord for text
 pub const TEXT_MAX_ROW: usize = TEXT_NUM_ROWS - 1;
 
@@ -93,8 +138,8 @@ pub struct VideoLine {
 }
 
 #[derive(Copy, Clone)]
-pub struct TextLine {
-    pub chars: [Glyph; TEXT_NUM_COLS],
+pub struct TextRow {
+    pub chars: [Glyph; TEXT_NUM_COLS_INC_BORDER],
 }
 
 /// This structure represents the framebuffer - a 2D array of monochome pixels.
@@ -111,7 +156,7 @@ where
     frame: usize,
     // buffer: [VideoLine; VISIBLE_LINES],
     video_line: VideoLine,
-    text_buffer: [TextLine; TEXT_NUM_ROWS],
+    text_buffer: [TextRow; TEXT_NUM_ROWS],
     col: usize,
     row: usize,
     hw: Option<T>,
@@ -127,8 +172,8 @@ where
             line_no: 0,
             fb_line: None,
             frame: 0,
-            text_buffer: [TextLine {
-                chars: [Glyph::Space; TEXT_NUM_COLS],
+            text_buffer: [TextRow {
+                chars: [Glyph::Solid; TEXT_NUM_COLS_INC_BORDER],
             }; TEXT_NUM_ROWS],
             video_line: VideoLine {
                 words: [0u16; HORIZONTAL_WORDS],
@@ -141,6 +186,8 @@ where
 
     /// Initialise the hardware (by calling the `configure` callback).
     pub fn init(&mut self, mut hw: T) {
+        // This all assumes an 8-pixel font (i.e. 1 byte or two per u16)
+        assert_eq!(FONT_WIDTH, 8);
         hw.configure(
             H_WHOLE_LINE,
             H_SYNC_PULSE,
@@ -148,6 +195,7 @@ where
             PIXEL_CLOCK,
         );
         self.hw = Some(hw);
+        self.clear();
     }
 
     /// Returns the current frame number.
@@ -159,35 +207,57 @@ where
     pub fn isr_sol(&mut self) {
         self.line_no += 1;
 
-        if self.line_no == V_WHOLE_FRAME {
-            self.line_no = 0;
-            if let Some(ref mut hw) = self.hw {
-                hw.vsync_on();
+        match self.line_no {
+            V_BACK_PORCH_FIRST => {
+                if let Some(ref mut hw) = self.hw {
+                    hw.vsync_off();
+                }
+                self.fb_line = None;
+            }
+            V_TOP_BORDER_FIRST...V_TOP_BORDER_LAST => {
+                self.solid_line();
+                self.fb_line = None;
+            }
+            V_DATA_FIRST...V_DATA_LAST => {
+                let line = self.line_no - V_DATA_FIRST;
+                self.calculate_pixels(line);
+                self.fb_line = Some(line);
+            }
+            V_BOTTOM_BORDER_FIRST...V_BOTTOM_BORDER_LAST => {
+                self.solid_line();
+                self.fb_line = None;
+            }
+            V_FRONT_PORCH_FIRST => {
+                // End of visible frame - increment counter
+                self.frame = self.frame.wrapping_add(1);
+                self.fb_line = None;
+            }
+            V_WHOLE_FRAME => {
+                // Wrap around
+                self.line_no = 0;
+                if let Some(ref mut hw) = self.hw {
+                    hw.vsync_on();
+                }
+                self.fb_line = None;
+            }
+            _ => {
+                // No output on this line
+                self.fb_line = None;
             }
         }
+    }
 
-        if self.line_no == V_SYNC_PULSE {
-            if let Some(ref mut hw) = self.hw {
-                hw.vsync_off();
+    /// Calculate a solid line of pixels for the border.
+    fn solid_line(&mut self) {
+        if let Some(ref mut hw) = self.hw {
+            for word in self.video_line.words.iter_mut() {
+                hw.write_pixels(0xFFFF);
+                *word = 0xFFFF;
             }
-        }
-
-        if (self.line_no >= V_SYNC_PULSE + V_BACK_PORCH)
-            && (self.line_no < V_SYNC_PULSE + V_BACK_PORCH + V_VISIBLE_AREA)
-        {
-            // Visible lines
-            // 600 visible lines, 300 output lines each shown twice
-            // let line = (self.line_no - (V_SYNC_PULSE + V_BACK_PORCH)) >> 1;
-            let line = self.line_no - (V_SYNC_PULSE + V_BACK_PORCH);
-            self.calculate_pixels(line);
-            self.fb_line = Some(line);
-        } else if self.line_no == V_SYNC_PULSE + V_BACK_PORCH + V_VISIBLE_AREA {
-            // End of visible frame - increment counter
-            self.frame = self.frame.wrapping_add(1);
-            self.fb_line = None;
         } else {
-            // Front porch
-            self.fb_line = None;
+            for word in self.video_line.words.iter_mut() {
+                *word = 0xFFFF;
+            }
         }
     }
 
@@ -222,7 +292,7 @@ where
     /// Clears the screen and resets the cursor to 0,0.
     pub fn clear(&mut self) {
         for row in self.text_buffer.iter_mut() {
-            for slot in row.chars.iter_mut() {
+            for slot in row.chars.iter_mut().skip(1).take(TEXT_NUM_COLS) {
                 *slot = Glyph::Space;
             }
         }
@@ -233,7 +303,8 @@ where
     /// Puts a char on screen at the specified place
     pub fn write_char_at(&mut self, ch: char, col: usize, row: usize, _flip: bool) {
         if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
-            self.text_buffer[row].chars[col] = Glyph::map_char(ch);
+            // Skip over the left border
+            self.text_buffer[row].chars[col + 1] = Glyph::map_char(ch);
         }
     }
 
@@ -285,9 +356,14 @@ where
                 for line in 0..TEXT_NUM_ROWS - 1 {
                     self.text_buffer[line] = self.text_buffer[line + 1];
                 }
-                self.text_buffer[TEXT_MAX_ROW] = TextLine {
-                    chars: [Glyph::Space; TEXT_NUM_COLS],
-                };
+                for slot in self.text_buffer[TEXT_MAX_ROW]
+                    .chars
+                    .iter_mut()
+                    .skip(1)
+                    .take(TEXT_NUM_COLS)
+                {
+                    *slot = Glyph::Space;
+                }
             }
         }
         Ok(())

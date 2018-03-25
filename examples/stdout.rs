@@ -1,6 +1,8 @@
 extern crate vga_framebuffer;
 
-struct Dummy;
+struct Dummy {
+    col: usize,
+}
 
 impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
     fn configure(&mut self, width: u32, sync_end: u32, line_start: u32, clock_rate: u32) {
@@ -20,28 +22,27 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
         println!("vsync_off");
     }
 
-    /// Called when pixels can be buffered for this line.
-    fn buffer_pixels(&mut self, _pixels: &vga_framebuffer::VideoLine) {}
-
     /// Called when pixels need to be written to the output pin.
-    fn write_pixels(&mut self, pixels: &vga_framebuffer::VideoLine) {
-        for word in &pixels.words {
-            for bit in (0..16).rev() {
-                if word & (1 << bit) != 0 {
-                    print!("@@");
-                } else {
-                    print!("..");
-                }
+    fn write_pixels(&mut self, pixels: u16) {
+        for bit in (0..16).rev() {
+            if pixels & (1 << bit) != 0 {
+                print!("@@");
+            } else {
+                print!("..");
             }
         }
-        println!();
+        self.col += 1;
+        if self.col == vga_framebuffer::HORIZONTAL_WORDS {
+            self.col = 0;
+            println!();
+        }
     }
 }
 
 use std::fmt::Write;
 
 fn main() {
-    let mut d = Dummy {};
+    let mut d = Dummy { col: 0 };
     let mut fb = Box::new(vga_framebuffer::FrameBuffer::new());
     fb.init(&mut d);
     fb.clear();
@@ -57,6 +58,5 @@ fn main() {
     writeln!(fb, "\nThis is a test").unwrap();
     for _ in 0..628 {
         fb.isr_sol();
-        fb.isr_data();
     }
 }
