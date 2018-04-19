@@ -1,19 +1,21 @@
 # VGA Framebuffer
 
-This crate implements a basic VGA framebuffer on an embedded microcontroller,
+This crate implements basic VGA text output on an embedded microcontroller,
 using nothing more than some timer peripherals and a few GPIO pins.
 
 ## The Specs:
 
 * 800 x 600 @ 60 Hz output signal with a 40 MHz pixel clock.
 * Monochrome (your choice of red, green or blue)
-* 400 x 300 pixel framebuffer
-* Requires just under 15 KiB of RAM
+* Double-width horizontal pixels, giving 400 x 600 output
+* 8x16 font glyphs
+* 40 column x 36 row text output
 * Single-buffered
-* Line and box drawing
+
+The pixels are double-width as I was unable to get 40 MHz SPI output
+functioning correctly on my particular micro, while 20 MHz works just fine.
 
 ## Contributing
 
-I'd happy accept a patch to enable 640 x 480 @ 60Hz (enabled with a `cfg`
-flag), but it requires a 36 MHz pixel clock and my test board can't do that so
-I can't test it.
+I'll happy accept a patches to enable other resolutions and/or other text
+resolutions.

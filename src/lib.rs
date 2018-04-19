@@ -105,16 +105,26 @@ pub trait Hardware {
     /// have a clock that runs at half the given rate, then double the given
     /// values.
     ///
-    /// The function `isr_sol` must be called at the start of the loop. You will
-    /// receive callbacks with pixel data as it is generated. Do not emit
-    /// any pixels until `line_start` elapses (store them in a FIFO).
+    /// You will receive calls to `write_pixels` as pixels are generated. Do
+    /// not emit any pixels until the `line_start` timer elapses (store them
+    /// in a FIFO).
     ///
-    /// The H-Sync pin must rise at start of loop and fall after `sync_end`
-    /// VGA pixels.
+    /// The H-Sync pin must rise at the start of the loop and fall after
+    /// `sync_end` clock ticks. We don't control it here because that would
+    /// add too much latency - you must change the H-Sync GPIO pin early in
+    /// the ISR yourself.
     ///
-    /// * width - length of a line (in 40 MHz pixels)
-    /// * sync_end - elapsed time (in 40 MHz pixels) before H-Sync needs to fall
-    /// * line_start - elapsed time (in 40 MHz pixels) before line_start ISR needs to fire
+    /// V-Sync is controlled by the current line number; you should implement
+    /// `vsync_on` and `vsync_off` which this code will call at the
+    /// appropriate time.
+    ///
+    /// * `width` - length of a line (in `clock_rate` pixels)
+    /// * `sync_end` - elapsed time (in `clock_rate` pixels) before H-Sync
+    ///   needs to fall
+    /// * `line_start` - elapsed time (in `clock_rate` pixels) before
+    ///   line_start ISR needs to fire
+    /// * `clock_rate` - the pixel clock rate in Hz (e.g. 40_000_000 for 40
+    ///   MHz)
     fn configure(&mut self, width: u32, sync_end: u32, line_start: u32, clock_rate: u32);
 
     /// Called when V-Sync needs to be high.
