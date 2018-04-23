@@ -183,7 +183,7 @@ where
             fb_line: None,
             frame: 0,
             text_buffer: [TextRow {
-                chars: [Glyph::Solid; TEXT_NUM_COLS_INC_BORDER],
+                chars: [Glyph::Unknown; TEXT_NUM_COLS_INC_BORDER],
             }; TEXT_NUM_ROWS],
             video_line: VideoLine {
                 words: [0u16; HORIZONTAL_WORDS],
