@@ -342,6 +342,16 @@ where
                     self.col = 0;
                     self.row += 1;
                 }
+                '\u{007f}' => {
+                    if self.col == 0 {
+                        self.col = TEXT_MAX_COL;
+                        if self.row > 0 {
+                            self.row -= 1;
+                        }
+                    } else {
+                        self.col -= 1;
+                    }
+                }
                 '\r' => {
                     self.col = 0;
                 }
