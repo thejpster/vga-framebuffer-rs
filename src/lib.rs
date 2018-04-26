@@ -44,7 +44,7 @@ extern crate bresenham;
 
 mod font;
 
-use font::*;
+pub use font::*;
 
 // See http://tinyvga.com/vga-timing/800x600@60Hz
 // These values assume a 40 MHz pixel clock
@@ -183,7 +183,7 @@ where
             fb_line: None,
             frame: 0,
             text_buffer: [TextRow {
-                chars: [Glyph::Unknown; TEXT_NUM_COLS_INC_BORDER],
+                chars: [Glyph::Null; TEXT_NUM_COLS_INC_BORDER],
             }; TEXT_NUM_ROWS],
             video_line: VideoLine {
                 words: [0u16; HORIZONTAL_WORDS],
@@ -205,6 +205,11 @@ where
             PIXEL_CLOCK,
         );
         self.hw = Some(hw);
+        // Fill in the side border
+        for row in self.text_buffer.iter_mut() {
+            row.chars[0] = Glyph::FullBlock;
+            row.chars[row.chars.len()-1] = Glyph::FullBlock;
+        }
         self.clear();
     }
 
@@ -310,11 +315,20 @@ where
         self.col = 0;
     }
 
-    /// Puts a char on screen at the specified place
+    /// Puts a char on screen at the specified place. Unicode chars are mapped
+    /// to Codepage 850 first.
     pub fn write_char_at(&mut self, ch: char, col: usize, row: usize, _flip: bool) {
         if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
             // Skip over the left border
             self.text_buffer[row].chars[col + 1] = Glyph::map_char(ch);
+        }
+    }
+
+    /// Puts a glyph on screen at the specified place
+    pub fn write_glyph_at(&mut self, glyph: Glyph, col: usize, row: usize, _flip: bool) {
+        if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
+            // Skip over the left border
+            self.text_buffer[row].chars[col + 1] = glyph;
         }
     }
 

@@ -19,6 +19,7 @@ for no, glyph in enumerate(glyphs):
 	camel_name = "".join(map(str.title, name.replace("-", " ").split()))
 	print("*" * 10)
 	print("Glyph {} ({}) = {} (Glyph::{})\n".format(no, uni, name, camel_name))
+	print("    {}, // Glyph::{}".format(",".join(map(lambda x: "0x%02x" % x, glyph)), camel_name))
 	for row in glyph:
 		for bit in range(0, 8):
 			if row & 1 << (7 - bit):
