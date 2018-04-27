@@ -72,7 +72,7 @@ const V_BOTTOM_BORDER_LAST: usize = V_FRONT_PORCH_FIRST - 1;
 const V_FRONT_PORCH_FIRST: usize = V_BOTTOM_BORDER_FIRST + V_BOTTOM_BORDER;
 
 const PIXEL_CLOCK: u32 = 40_000_000;
-const BITS_PER_WORD: usize = 16;
+const BITS_PER_WORD: usize = 8;
 
 /// Number of lines in frame buffer
 pub const VISIBLE_LINES: usize = 600;
@@ -134,7 +134,7 @@ pub trait Hardware {
     fn vsync_off(&mut self);
 
     /// Called word by word as pixels are calculated
-    fn write_pixels(&mut self, pixels: u16);
+    fn write_pixels(&mut self, red: u8, green: u8, blue: u8);
 }
 
 /// A point on the screen.
@@ -143,20 +143,16 @@ pub trait Hardware {
 pub struct Point(pub usize, pub usize);
 
 #[derive(Copy, Clone)]
-pub struct VideoLine {
-    pub words: [u16; HORIZONTAL_WORDS],
-}
-
-#[derive(Copy, Clone)]
 pub struct TextRow {
-    pub chars: [Glyph; TEXT_NUM_COLS_INC_BORDER],
+    pub glyphs: [Glyph; TEXT_NUM_COLS_INC_BORDER],
 }
 
 /// This structure represents the framebuffer - a 2D array of monochome pixels.
 ///
 /// The framebuffer is stored as an array of horizontal lines, where each line
-/// is comprised of 16 bit words. This suits the SPI peripheral on an LM4F120
-/// which can emit 16 bits at a time.
+/// is comprised of 8 bit words. This suits our timing needs as although the
+/// SPI peripheral on an LM4F120 which can emit 16 bits at a time, 8 proves
+/// easier to work with.
 pub struct FrameBuffer<T>
 where
     T: Hardware,
@@ -164,8 +160,6 @@ where
     line_no: usize,
     fb_line: Option<usize>,
     frame: usize,
-    // buffer: [VideoLine; VISIBLE_LINES],
-    video_line: VideoLine,
     text_buffer: [TextRow; TEXT_NUM_ROWS],
     col: usize,
     row: usize,
@@ -183,11 +177,8 @@ where
             fb_line: None,
             frame: 0,
             text_buffer: [TextRow {
-                chars: [Glyph::Null; TEXT_NUM_COLS_INC_BORDER],
+                glyphs: [Glyph::Null; TEXT_NUM_COLS_INC_BORDER],
             }; TEXT_NUM_ROWS],
-            video_line: VideoLine {
-                words: [0u16; HORIZONTAL_WORDS],
-            },
             hw: None,
             col: 0,
             row: 0,
@@ -207,8 +198,8 @@ where
         self.hw = Some(hw);
         // Fill in the side border
         for row in self.text_buffer.iter_mut() {
-            row.chars[0] = Glyph::FullBlock;
-            row.chars[row.chars.len()-1] = Glyph::FullBlock;
+            row.glyphs[0] = Glyph::FullBlock;
+            row.glyphs[row.glyphs.len()-1] = Glyph::FullBlock;
         }
         self.clear();
     }
@@ -265,13 +256,8 @@ where
     /// Calculate a solid line of pixels for the border.
     fn solid_line(&mut self) {
         if let Some(ref mut hw) = self.hw {
-            for word in self.video_line.words.iter_mut() {
-                hw.write_pixels(0xFFFF);
-                *word = 0xFFFF;
-            }
-        } else {
-            for word in self.video_line.words.iter_mut() {
-                *word = 0xFFFF;
+            for _ in 0..HORIZONTAL_WORDS {
+                hw.write_pixels(0xFF, 0xFF, 0xFF);
             }
         }
     }
@@ -283,23 +269,12 @@ where
     fn calculate_pixels(&mut self, line: usize) {
         let text_row = line / FONT_HEIGHT;
         let font_row = line % FONT_HEIGHT;
-        if text_row < TEXT_NUM_ROWS {
-            for (ch_pair, word) in self.text_buffer[text_row]
-                .chars
-                .chunks(2)
-                .zip(self.video_line.words.iter_mut())
-            {
-                let b0 = ch_pair[0].pixels(font_row) as u16;
-                let b1 = ch_pair[1].pixels(font_row) as u16;
-                let w = (b0 << 8) | b1;
-                if let Some(ref mut hw) = self.hw {
-                    hw.write_pixels(w);
+        if let Some(ref mut hw) = self.hw {
+            if text_row < TEXT_NUM_ROWS {
+                for ch in self.text_buffer[text_row].glyphs.iter() {
+                    let w = ch.pixels(font_row);
+                    hw.write_pixels(w, w, w);
                 }
-                *word = w;
-            }
-        } else {
-            for word in self.video_line.words.iter_mut() {
-                *word = 0;
             }
         }
     }
@@ -307,7 +282,7 @@ where
     /// Clears the screen and resets the cursor to 0,0.
     pub fn clear(&mut self) {
         for row in self.text_buffer.iter_mut() {
-            for slot in row.chars.iter_mut().skip(1).take(TEXT_NUM_COLS) {
+            for slot in row.glyphs.iter_mut().skip(1).take(TEXT_NUM_COLS) {
                 *slot = Glyph::Space;
             }
         }
@@ -320,7 +295,7 @@ where
     pub fn write_char_at(&mut self, ch: char, col: usize, row: usize, _flip: bool) {
         if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
             // Skip over the left border
-            self.text_buffer[row].chars[col + 1] = Glyph::map_char(ch);
+            self.text_buffer[row].glyphs[col + 1] = Glyph::map_char(ch);
         }
     }
 
@@ -328,7 +303,7 @@ where
     pub fn write_glyph_at(&mut self, glyph: Glyph, col: usize, row: usize, _flip: bool) {
         if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
             // Skip over the left border
-            self.text_buffer[row].chars[col + 1] = glyph;
+            self.text_buffer[row].glyphs[col + 1] = glyph;
         }
     }
 
@@ -391,7 +366,7 @@ where
                     self.text_buffer[line] = self.text_buffer[line + 1];
                 }
                 for slot in self.text_buffer[TEXT_MAX_ROW]
-                    .chars
+                    .glyphs
                     .iter_mut()
                     .skip(1)
                     .take(TEXT_NUM_COLS)
