@@ -5,203 +5,203 @@ pub const FONT_HEIGHT: usize = 16;
 #[repr(u8)]
 #[derive(Copy, Clone)]
 pub enum Glyph {
-    Null, // Glyph 0 (('\x00', 1)) = UNKNOWN
-    SOH, // Glyph 1 (('\x01', 1)) = UNKNOWN
-    STX, // Glyph 2 (('\x02', 1)) = UNKNOWN
-    ETX, // Glyph 3 (('\x03', 1)) = UNKNOWN
-    EOT, // Glyph 4 (('\x04', 1)) = UNKNOWN
-    ENQ, // Glyph 5 (('\x05', 1)) = UNKNOWN
-    ACK, // Glyph 6 (('\x06', 1)) = UNKNOWN
-    BEL, // Glyph 7 (('\x07', 1)) = UNKNOWN
-    BS, // Glyph 8 (('\x08', 1)) = UNKNOWN
-    HT, // Glyph 9 (('\t', 1)) = UNKNOWN
-    LF, // Glyph 10 (('\n', 1)) = UNKNOWN
-    VT, // Glyph 11 (('\x0b', 1)) = UNKNOWN
-    FF, // Glyph 12 (('\x0c', 1)) = UNKNOWN
-    CR, // Glyph 13 (('\r', 1)) = UNKNOWN
-    SO, // Glyph 14 (('\x0e', 1)) = UNKNOWN
-    SI, // Glyph 15 (('\x0f', 1)) = UNKNOWN
-    DLE, // Glyph 16 (('\x10', 1)) = UNKNOWN
-    DC1, // Glyph 17 (('\x11', 1)) = UNKNOWN
-    DC2, // Glyph 18 (('\x12', 1)) = UNKNOWN
-    DC3, // Glyph 19 (('\x13', 1)) = UNKNOWN
-    DC4, // Glyph 20 (('\x14', 1)) = UNKNOWN
-    NAK, // Glyph 21 (('\x15', 1)) = UNKNOWN
-    SYN, // Glyph 22 (('\x16', 1)) = UNKNOWN
-    ETB, // Glyph 23 (('\x17', 1)) = UNKNOWN
-    CAN, // Glyph 24 (('\x18', 1)) = UNKNOWN
-    EM, // Glyph 25 (('\x19', 1)) = UNKNOWN
-    SUB, // Glyph 26 (('\x1a', 1)) = UNKNOWN
-    Escape, // Glyph 27 (('\x1b', 1)) = UNKNOWN
-    FS, // Glyph 28 (('\x1c', 1)) = UNKNOWN
-    GS, // Glyph 29 (('\x1d', 1)) = UNKNOWN
-    RS, // Glyph 30 (('\x1e', 1)) = UNKNOWN
-    US, // Glyph 31 (('\x1f', 1)) = UNKNOWN
-    Space, // Glyph 32 ((' ', 1)) = SPACE
-    ExclamationMark, // Glyph 33 (('!', 1)) = EXCLAMATION MARK
-    QuotationMark, // Glyph 34 (('"', 1)) = QUOTATION MARK
-    NumberSign, // Glyph 35 (('#', 1)) = NUMBER SIGN
-    DollarSign, // Glyph 36 (('$', 1)) = DOLLAR SIGN
-    PercentSign, // Glyph 37 (('%', 1)) = PERCENT SIGN
-    Ampersand, // Glyph 38 (('&', 1)) = AMPERSAND
-    Apostrophe, // Glyph 39 (("'", 1)) = APOSTROPHE
-    LeftParenthesis, // Glyph 40 (('(', 1)) = LEFT PARENTHESIS
-    RightParenthesis, // Glyph 41 ((')', 1)) = RIGHT PARENTHESIS
-    Asterisk, // Glyph 42 (('*', 1)) = ASTERISK
-    PlusSign, // Glyph 43 (('+', 1)) = PLUS SIGN
-    Comma, // Glyph 44 ((',', 1)) = COMMA
-    HyphenMinus, // Glyph 45 (('-', 1)) = HYPHEN-MINUS
-    FullStop, // Glyph 46 (('.', 1)) = FULL STOP
-    Solidus, // Glyph 47 (('/', 1)) = SOLIDUS
-    DigitZero, // Glyph 48 (('0', 1)) = DIGIT ZERO
-    DigitOne, // Glyph 49 (('1', 1)) = DIGIT ONE
-    DigitTwo, // Glyph 50 (('2', 1)) = DIGIT TWO
-    DigitThree, // Glyph 51 (('3', 1)) = DIGIT THREE
-    DigitFour, // Glyph 52 (('4', 1)) = DIGIT FOUR
-    DigitFive, // Glyph 53 (('5', 1)) = DIGIT FIVE
-    DigitSix, // Glyph 54 (('6', 1)) = DIGIT SIX
-    DigitSeven, // Glyph 55 (('7', 1)) = DIGIT SEVEN
-    DigitEight, // Glyph 56 (('8', 1)) = DIGIT EIGHT
-    DigitNine, // Glyph 57 (('9', 1)) = DIGIT NINE
-    Colon, // Glyph 58 ((':', 1)) = COLON
-    Semicolon, // Glyph 59 ((';', 1)) = SEMICOLON
-    LessThanSign, // Glyph 60 (('<', 1)) = LESS-THAN SIGN
-    EqualsSign, // Glyph 61 (('=', 1)) = EQUALS SIGN
-    GreaterThanSign, // Glyph 62 (('>', 1)) = GREATER-THAN SIGN
-    QuestionMark, // Glyph 63 (('?', 1)) = QUESTION MARK
-    CommercialAt, // Glyph 64 (('@', 1)) = COMMERCIAL AT
-    LatinCapitalLetterA, // Glyph 65 (('A', 1)) = LATIN CAPITAL LETTER A
-    LatinCapitalLetterB, // Glyph 66 (('B', 1)) = LATIN CAPITAL LETTER B
-    LatinCapitalLetterC, // Glyph 67 (('C', 1)) = LATIN CAPITAL LETTER C
-    LatinCapitalLetterD, // Glyph 68 (('D', 1)) = LATIN CAPITAL LETTER D
-    LatinCapitalLetterE, // Glyph 69 (('E', 1)) = LATIN CAPITAL LETTER E
-    LatinCapitalLetterF, // Glyph 70 (('F', 1)) = LATIN CAPITAL LETTER F
-    LatinCapitalLetterG, // Glyph 71 (('G', 1)) = LATIN CAPITAL LETTER G
-    LatinCapitalLetterH, // Glyph 72 (('H', 1)) = LATIN CAPITAL LETTER H
-    LatinCapitalLetterI, // Glyph 73 (('I', 1)) = LATIN CAPITAL LETTER I
-    LatinCapitalLetterJ, // Glyph 74 (('J', 1)) = LATIN CAPITAL LETTER J
-    LatinCapitalLetterK, // Glyph 75 (('K', 1)) = LATIN CAPITAL LETTER K
-    LatinCapitalLetterL, // Glyph 76 (('L', 1)) = LATIN CAPITAL LETTER L
-    LatinCapitalLetterM, // Glyph 77 (('M', 1)) = LATIN CAPITAL LETTER M
-    LatinCapitalLetterN, // Glyph 78 (('N', 1)) = LATIN CAPITAL LETTER N
-    LatinCapitalLetterO, // Glyph 79 (('O', 1)) = LATIN CAPITAL LETTER O
-    LatinCapitalLetterP, // Glyph 80 (('P', 1)) = LATIN CAPITAL LETTER P
-    LatinCapitalLetterQ, // Glyph 81 (('Q', 1)) = LATIN CAPITAL LETTER Q
-    LatinCapitalLetterR, // Glyph 82 (('R', 1)) = LATIN CAPITAL LETTER R
-    LatinCapitalLetterS, // Glyph 83 (('S', 1)) = LATIN CAPITAL LETTER S
-    LatinCapitalLetterT, // Glyph 84 (('T', 1)) = LATIN CAPITAL LETTER T
-    LatinCapitalLetterU, // Glyph 85 (('U', 1)) = LATIN CAPITAL LETTER U
-    LatinCapitalLetterV, // Glyph 86 (('V', 1)) = LATIN CAPITAL LETTER V
-    LatinCapitalLetterW, // Glyph 87 (('W', 1)) = LATIN CAPITAL LETTER W
-    LatinCapitalLetterX, // Glyph 88 (('X', 1)) = LATIN CAPITAL LETTER X
-    LatinCapitalLetterY, // Glyph 89 (('Y', 1)) = LATIN CAPITAL LETTER Y
-    LatinCapitalLetterZ, // Glyph 90 (('Z', 1)) = LATIN CAPITAL LETTER Z
-    LeftSquareBracket, // Glyph 91 (('[', 1)) = LEFT SQUARE BRACKET
-    ReverseSolidus, // Glyph 92 (('\\', 1)) = REVERSE SOLIDUS
-    RightSquareBracket, // Glyph 93 ((']', 1)) = RIGHT SQUARE BRACKET
-    CircumflexAccent, // Glyph 94 (('^', 1)) = CIRCUMFLEX ACCENT
-    LowLine, // Glyph 95 (('_', 1)) = LOW LINE
-    GraveAccent, // Glyph 96 (('`', 1)) = GRAVE ACCENT
-    LatinSmallLetterA, // Glyph 97 (('a', 1)) = LATIN SMALL LETTER A
-    LatinSmallLetterB, // Glyph 98 (('b', 1)) = LATIN SMALL LETTER B
-    LatinSmallLetterC, // Glyph 99 (('c', 1)) = LATIN SMALL LETTER C
-    LatinSmallLetterD, // Glyph 100 (('d', 1)) = LATIN SMALL LETTER D
-    LatinSmallLetterE, // Glyph 101 (('e', 1)) = LATIN SMALL LETTER E
-    LatinSmallLetterF, // Glyph 102 (('f', 1)) = LATIN SMALL LETTER F
-    LatinSmallLetterG, // Glyph 103 (('g', 1)) = LATIN SMALL LETTER G
-    LatinSmallLetterH, // Glyph 104 (('h', 1)) = LATIN SMALL LETTER H
-    LatinSmallLetterI, // Glyph 105 (('i', 1)) = LATIN SMALL LETTER I
-    LatinSmallLetterJ, // Glyph 106 (('j', 1)) = LATIN SMALL LETTER J
-    LatinSmallLetterK, // Glyph 107 (('k', 1)) = LATIN SMALL LETTER K
-    LatinSmallLetterL, // Glyph 108 (('l', 1)) = LATIN SMALL LETTER L
-    LatinSmallLetterM, // Glyph 109 (('m', 1)) = LATIN SMALL LETTER M
-    LatinSmallLetterN, // Glyph 110 (('n', 1)) = LATIN SMALL LETTER N
-    LatinSmallLetterO, // Glyph 111 (('o', 1)) = LATIN SMALL LETTER O
-    LatinSmallLetterP, // Glyph 112 (('p', 1)) = LATIN SMALL LETTER P
-    LatinSmallLetterQ, // Glyph 113 (('q', 1)) = LATIN SMALL LETTER Q
-    LatinSmallLetterR, // Glyph 114 (('r', 1)) = LATIN SMALL LETTER R
-    LatinSmallLetterS, // Glyph 115 (('s', 1)) = LATIN SMALL LETTER S
-    LatinSmallLetterT, // Glyph 116 (('t', 1)) = LATIN SMALL LETTER T
-    LatinSmallLetterU, // Glyph 117 (('u', 1)) = LATIN SMALL LETTER U
-    LatinSmallLetterV, // Glyph 118 (('v', 1)) = LATIN SMALL LETTER V
-    LatinSmallLetterW, // Glyph 119 (('w', 1)) = LATIN SMALL LETTER W
-    LatinSmallLetterX, // Glyph 120 (('x', 1)) = LATIN SMALL LETTER X
-    LatinSmallLetterY, // Glyph 121 (('y', 1)) = LATIN SMALL LETTER Y
-    LatinSmallLetterZ, // Glyph 122 (('z', 1)) = LATIN SMALL LETTER Z
-    LeftCurlyBracket, // Glyph 123 (('{', 1)) = LEFT CURLY BRACKET
-    VerticalLine, // Glyph 124 (('|', 1)) = VERTICAL LINE
-    RightCurlyBracket, // Glyph 125 (('}', 1)) = RIGHT CURLY BRACKET
-    Tilde, // Glyph 126 (('~', 1)) = TILDE
-    Delete, // Glyph 127 (('\x7f', 1)) = DELETE
+    Null,                                   // Glyph 0 (('\x00', 1)) = UNKNOWN
+    SOH,                                    // Glyph 1 (('\x01', 1)) = UNKNOWN
+    STX,                                    // Glyph 2 (('\x02', 1)) = UNKNOWN
+    ETX,                                    // Glyph 3 (('\x03', 1)) = UNKNOWN
+    EOT,                                    // Glyph 4 (('\x04', 1)) = UNKNOWN
+    ENQ,                                    // Glyph 5 (('\x05', 1)) = UNKNOWN
+    ACK,                                    // Glyph 6 (('\x06', 1)) = UNKNOWN
+    BEL,                                    // Glyph 7 (('\x07', 1)) = UNKNOWN
+    BS,                                     // Glyph 8 (('\x08', 1)) = UNKNOWN
+    HT,                                     // Glyph 9 (('\t', 1)) = UNKNOWN
+    LF,                                     // Glyph 10 (('\n', 1)) = UNKNOWN
+    VT,                                     // Glyph 11 (('\x0b', 1)) = UNKNOWN
+    FF,                                     // Glyph 12 (('\x0c', 1)) = UNKNOWN
+    CR,                                     // Glyph 13 (('\r', 1)) = UNKNOWN
+    SO,                                     // Glyph 14 (('\x0e', 1)) = UNKNOWN
+    SI,                                     // Glyph 15 (('\x0f', 1)) = UNKNOWN
+    DLE,                                    // Glyph 16 (('\x10', 1)) = UNKNOWN
+    DC1,                                    // Glyph 17 (('\x11', 1)) = UNKNOWN
+    DC2,                                    // Glyph 18 (('\x12', 1)) = UNKNOWN
+    DC3,                                    // Glyph 19 (('\x13', 1)) = UNKNOWN
+    DC4,                                    // Glyph 20 (('\x14', 1)) = UNKNOWN
+    NAK,                                    // Glyph 21 (('\x15', 1)) = UNKNOWN
+    SYN,                                    // Glyph 22 (('\x16', 1)) = UNKNOWN
+    ETB,                                    // Glyph 23 (('\x17', 1)) = UNKNOWN
+    CAN,                                    // Glyph 24 (('\x18', 1)) = UNKNOWN
+    EM,                                     // Glyph 25 (('\x19', 1)) = UNKNOWN
+    SUB,                                    // Glyph 26 (('\x1a', 1)) = UNKNOWN
+    Escape,                                 // Glyph 27 (('\x1b', 1)) = UNKNOWN
+    FS,                                     // Glyph 28 (('\x1c', 1)) = UNKNOWN
+    GS,                                     // Glyph 29 (('\x1d', 1)) = UNKNOWN
+    RS,                                     // Glyph 30 (('\x1e', 1)) = UNKNOWN
+    US,                                     // Glyph 31 (('\x1f', 1)) = UNKNOWN
+    Space,                                  // Glyph 32 ((' ', 1)) = SPACE
+    ExclamationMark,                        // Glyph 33 (('!', 1)) = EXCLAMATION MARK
+    QuotationMark,                          // Glyph 34 (('"', 1)) = QUOTATION MARK
+    NumberSign,                             // Glyph 35 (('#', 1)) = NUMBER SIGN
+    DollarSign,                             // Glyph 36 (('$', 1)) = DOLLAR SIGN
+    PercentSign,                            // Glyph 37 (('%', 1)) = PERCENT SIGN
+    Ampersand,                              // Glyph 38 (('&', 1)) = AMPERSAND
+    Apostrophe,                             // Glyph 39 (("'", 1)) = APOSTROPHE
+    LeftParenthesis,                        // Glyph 40 (('(', 1)) = LEFT PARENTHESIS
+    RightParenthesis,                       // Glyph 41 ((')', 1)) = RIGHT PARENTHESIS
+    Asterisk,                               // Glyph 42 (('*', 1)) = ASTERISK
+    PlusSign,                               // Glyph 43 (('+', 1)) = PLUS SIGN
+    Comma,                                  // Glyph 44 ((',', 1)) = COMMA
+    HyphenMinus,                            // Glyph 45 (('-', 1)) = HYPHEN-MINUS
+    FullStop,                               // Glyph 46 (('.', 1)) = FULL STOP
+    Solidus,                                // Glyph 47 (('/', 1)) = SOLIDUS
+    DigitZero,                              // Glyph 48 (('0', 1)) = DIGIT ZERO
+    DigitOne,                               // Glyph 49 (('1', 1)) = DIGIT ONE
+    DigitTwo,                               // Glyph 50 (('2', 1)) = DIGIT TWO
+    DigitThree,                             // Glyph 51 (('3', 1)) = DIGIT THREE
+    DigitFour,                              // Glyph 52 (('4', 1)) = DIGIT FOUR
+    DigitFive,                              // Glyph 53 (('5', 1)) = DIGIT FIVE
+    DigitSix,                               // Glyph 54 (('6', 1)) = DIGIT SIX
+    DigitSeven,                             // Glyph 55 (('7', 1)) = DIGIT SEVEN
+    DigitEight,                             // Glyph 56 (('8', 1)) = DIGIT EIGHT
+    DigitNine,                              // Glyph 57 (('9', 1)) = DIGIT NINE
+    Colon,                                  // Glyph 58 ((':', 1)) = COLON
+    Semicolon,                              // Glyph 59 ((';', 1)) = SEMICOLON
+    LessThanSign,                           // Glyph 60 (('<', 1)) = LESS-THAN SIGN
+    EqualsSign,                             // Glyph 61 (('=', 1)) = EQUALS SIGN
+    GreaterThanSign,                        // Glyph 62 (('>', 1)) = GREATER-THAN SIGN
+    QuestionMark,                           // Glyph 63 (('?', 1)) = QUESTION MARK
+    CommercialAt,                           // Glyph 64 (('@', 1)) = COMMERCIAL AT
+    LatinCapitalLetterA,                    // Glyph 65 (('A', 1)) = LATIN CAPITAL LETTER A
+    LatinCapitalLetterB,                    // Glyph 66 (('B', 1)) = LATIN CAPITAL LETTER B
+    LatinCapitalLetterC,                    // Glyph 67 (('C', 1)) = LATIN CAPITAL LETTER C
+    LatinCapitalLetterD,                    // Glyph 68 (('D', 1)) = LATIN CAPITAL LETTER D
+    LatinCapitalLetterE,                    // Glyph 69 (('E', 1)) = LATIN CAPITAL LETTER E
+    LatinCapitalLetterF,                    // Glyph 70 (('F', 1)) = LATIN CAPITAL LETTER F
+    LatinCapitalLetterG,                    // Glyph 71 (('G', 1)) = LATIN CAPITAL LETTER G
+    LatinCapitalLetterH,                    // Glyph 72 (('H', 1)) = LATIN CAPITAL LETTER H
+    LatinCapitalLetterI,                    // Glyph 73 (('I', 1)) = LATIN CAPITAL LETTER I
+    LatinCapitalLetterJ,                    // Glyph 74 (('J', 1)) = LATIN CAPITAL LETTER J
+    LatinCapitalLetterK,                    // Glyph 75 (('K', 1)) = LATIN CAPITAL LETTER K
+    LatinCapitalLetterL,                    // Glyph 76 (('L', 1)) = LATIN CAPITAL LETTER L
+    LatinCapitalLetterM,                    // Glyph 77 (('M', 1)) = LATIN CAPITAL LETTER M
+    LatinCapitalLetterN,                    // Glyph 78 (('N', 1)) = LATIN CAPITAL LETTER N
+    LatinCapitalLetterO,                    // Glyph 79 (('O', 1)) = LATIN CAPITAL LETTER O
+    LatinCapitalLetterP,                    // Glyph 80 (('P', 1)) = LATIN CAPITAL LETTER P
+    LatinCapitalLetterQ,                    // Glyph 81 (('Q', 1)) = LATIN CAPITAL LETTER Q
+    LatinCapitalLetterR,                    // Glyph 82 (('R', 1)) = LATIN CAPITAL LETTER R
+    LatinCapitalLetterS,                    // Glyph 83 (('S', 1)) = LATIN CAPITAL LETTER S
+    LatinCapitalLetterT,                    // Glyph 84 (('T', 1)) = LATIN CAPITAL LETTER T
+    LatinCapitalLetterU,                    // Glyph 85 (('U', 1)) = LATIN CAPITAL LETTER U
+    LatinCapitalLetterV,                    // Glyph 86 (('V', 1)) = LATIN CAPITAL LETTER V
+    LatinCapitalLetterW,                    // Glyph 87 (('W', 1)) = LATIN CAPITAL LETTER W
+    LatinCapitalLetterX,                    // Glyph 88 (('X', 1)) = LATIN CAPITAL LETTER X
+    LatinCapitalLetterY,                    // Glyph 89 (('Y', 1)) = LATIN CAPITAL LETTER Y
+    LatinCapitalLetterZ,                    // Glyph 90 (('Z', 1)) = LATIN CAPITAL LETTER Z
+    LeftSquareBracket,                      // Glyph 91 (('[', 1)) = LEFT SQUARE BRACKET
+    ReverseSolidus,                         // Glyph 92 (('\\', 1)) = REVERSE SOLIDUS
+    RightSquareBracket,                     // Glyph 93 ((']', 1)) = RIGHT SQUARE BRACKET
+    CircumflexAccent,                       // Glyph 94 (('^', 1)) = CIRCUMFLEX ACCENT
+    LowLine,                                // Glyph 95 (('_', 1)) = LOW LINE
+    GraveAccent,                            // Glyph 96 (('`', 1)) = GRAVE ACCENT
+    LatinSmallLetterA,                      // Glyph 97 (('a', 1)) = LATIN SMALL LETTER A
+    LatinSmallLetterB,                      // Glyph 98 (('b', 1)) = LATIN SMALL LETTER B
+    LatinSmallLetterC,                      // Glyph 99 (('c', 1)) = LATIN SMALL LETTER C
+    LatinSmallLetterD,                      // Glyph 100 (('d', 1)) = LATIN SMALL LETTER D
+    LatinSmallLetterE,                      // Glyph 101 (('e', 1)) = LATIN SMALL LETTER E
+    LatinSmallLetterF,                      // Glyph 102 (('f', 1)) = LATIN SMALL LETTER F
+    LatinSmallLetterG,                      // Glyph 103 (('g', 1)) = LATIN SMALL LETTER G
+    LatinSmallLetterH,                      // Glyph 104 (('h', 1)) = LATIN SMALL LETTER H
+    LatinSmallLetterI,                      // Glyph 105 (('i', 1)) = LATIN SMALL LETTER I
+    LatinSmallLetterJ,                      // Glyph 106 (('j', 1)) = LATIN SMALL LETTER J
+    LatinSmallLetterK,                      // Glyph 107 (('k', 1)) = LATIN SMALL LETTER K
+    LatinSmallLetterL,                      // Glyph 108 (('l', 1)) = LATIN SMALL LETTER L
+    LatinSmallLetterM,                      // Glyph 109 (('m', 1)) = LATIN SMALL LETTER M
+    LatinSmallLetterN,                      // Glyph 110 (('n', 1)) = LATIN SMALL LETTER N
+    LatinSmallLetterO,                      // Glyph 111 (('o', 1)) = LATIN SMALL LETTER O
+    LatinSmallLetterP,                      // Glyph 112 (('p', 1)) = LATIN SMALL LETTER P
+    LatinSmallLetterQ,                      // Glyph 113 (('q', 1)) = LATIN SMALL LETTER Q
+    LatinSmallLetterR,                      // Glyph 114 (('r', 1)) = LATIN SMALL LETTER R
+    LatinSmallLetterS,                      // Glyph 115 (('s', 1)) = LATIN SMALL LETTER S
+    LatinSmallLetterT,                      // Glyph 116 (('t', 1)) = LATIN SMALL LETTER T
+    LatinSmallLetterU,                      // Glyph 117 (('u', 1)) = LATIN SMALL LETTER U
+    LatinSmallLetterV,                      // Glyph 118 (('v', 1)) = LATIN SMALL LETTER V
+    LatinSmallLetterW,                      // Glyph 119 (('w', 1)) = LATIN SMALL LETTER W
+    LatinSmallLetterX,                      // Glyph 120 (('x', 1)) = LATIN SMALL LETTER X
+    LatinSmallLetterY,                      // Glyph 121 (('y', 1)) = LATIN SMALL LETTER Y
+    LatinSmallLetterZ,                      // Glyph 122 (('z', 1)) = LATIN SMALL LETTER Z
+    LeftCurlyBracket,                       // Glyph 123 (('{', 1)) = LEFT CURLY BRACKET
+    VerticalLine,                           // Glyph 124 (('|', 1)) = VERTICAL LINE
+    RightCurlyBracket,                      // Glyph 125 (('}', 1)) = RIGHT CURLY BRACKET
+    Tilde,                                  // Glyph 126 (('~', 1)) = TILDE
+    Delete,                                 // Glyph 127 (('\x7f', 1)) = DELETE
     LatinCapitalLetterCWithCedilla, // Glyph 128 (('Ç', 1)) = LATIN CAPITAL LETTER C WITH CEDILLA
     LatinSmallLetterUWithDiaeresis, // Glyph 129 (('ü', 1)) = LATIN SMALL LETTER U WITH DIAERESIS
-    LatinSmallLetterEWithAcute, // Glyph 130 (('é', 1)) = LATIN SMALL LETTER E WITH ACUTE
+    LatinSmallLetterEWithAcute,     // Glyph 130 (('é', 1)) = LATIN SMALL LETTER E WITH ACUTE
     LatinSmallLetterAWithCircumflex, // Glyph 131 (('â', 1)) = LATIN SMALL LETTER A WITH CIRCUMFLEX
     LatinSmallLetterAWithDiaeresis, // Glyph 132 (('ä', 1)) = LATIN SMALL LETTER A WITH DIAERESIS
-    LatinSmallLetterAWithGrave, // Glyph 133 (('à', 1)) = LATIN SMALL LETTER A WITH GRAVE
+    LatinSmallLetterAWithGrave,     // Glyph 133 (('à', 1)) = LATIN SMALL LETTER A WITH GRAVE
     LatinSmallLetterAWithRingAbove, // Glyph 134 (('å', 1)) = LATIN SMALL LETTER A WITH RING ABOVE
-    LatinSmallLetterCWithCedilla, // Glyph 135 (('ç', 1)) = LATIN SMALL LETTER C WITH CEDILLA
+    LatinSmallLetterCWithCedilla,   // Glyph 135 (('ç', 1)) = LATIN SMALL LETTER C WITH CEDILLA
     LatinSmallLetterEWithCircumflex, // Glyph 136 (('ê', 1)) = LATIN SMALL LETTER E WITH CIRCUMFLEX
     LatinSmallLetterEWithDiaeresis, // Glyph 137 (('ë', 1)) = LATIN SMALL LETTER E WITH DIAERESIS
-    LatinSmallLetterEWithGrave, // Glyph 138 (('è', 1)) = LATIN SMALL LETTER E WITH GRAVE
+    LatinSmallLetterEWithGrave,     // Glyph 138 (('è', 1)) = LATIN SMALL LETTER E WITH GRAVE
     LatinSmallLetterIWithDiaeresis, // Glyph 139 (('ï', 1)) = LATIN SMALL LETTER I WITH DIAERESIS
     LatinSmallLetterIWithCircumflex, // Glyph 140 (('î', 1)) = LATIN SMALL LETTER I WITH CIRCUMFLEX
-    LatinSmallLetterIWithGrave, // Glyph 141 (('ì', 1)) = LATIN SMALL LETTER I WITH GRAVE
+    LatinSmallLetterIWithGrave,     // Glyph 141 (('ì', 1)) = LATIN SMALL LETTER I WITH GRAVE
     LatinCapitalLetterAWithDiaeresis, // Glyph 142 (('Ä', 1)) = LATIN CAPITAL LETTER A WITH DIAERESIS
     LatinCapitalLetterAWithRingAbove, // Glyph 143 (('Å', 1)) = LATIN CAPITAL LETTER A WITH RING ABOVE
-    LatinCapitalLetterEWithAcute, // Glyph 144 (('É', 1)) = LATIN CAPITAL LETTER E WITH ACUTE
-    LatinSmallLetterAe, // Glyph 145 (('æ', 1)) = LATIN SMALL LETTER AE
-    LatinCapitalLetterAe, // Glyph 146 (('Æ', 1)) = LATIN CAPITAL LETTER AE
+    LatinCapitalLetterEWithAcute,     // Glyph 144 (('É', 1)) = LATIN CAPITAL LETTER E WITH ACUTE
+    LatinSmallLetterAe,               // Glyph 145 (('æ', 1)) = LATIN SMALL LETTER AE
+    LatinCapitalLetterAe,             // Glyph 146 (('Æ', 1)) = LATIN CAPITAL LETTER AE
     LatinSmallLetterOWithCircumflex, // Glyph 147 (('ô', 1)) = LATIN SMALL LETTER O WITH CIRCUMFLEX
-    LatinSmallLetterOWithDiaeresis, // Glyph 148 (('ö', 1)) = LATIN SMALL LETTER O WITH DIAERESIS
-    LatinSmallLetterOWithGrave, // Glyph 149 (('ò', 1)) = LATIN SMALL LETTER O WITH GRAVE
+    LatinSmallLetterOWithDiaeresis,  // Glyph 148 (('ö', 1)) = LATIN SMALL LETTER O WITH DIAERESIS
+    LatinSmallLetterOWithGrave,      // Glyph 149 (('ò', 1)) = LATIN SMALL LETTER O WITH GRAVE
     LatinSmallLetterUWithCircumflex, // Glyph 150 (('û', 1)) = LATIN SMALL LETTER U WITH CIRCUMFLEX
-    LatinSmallLetterUWithGrave, // Glyph 151 (('ù', 1)) = LATIN SMALL LETTER U WITH GRAVE
-    LatinSmallLetterYWithDiaeresis, // Glyph 152 (('ÿ', 1)) = LATIN SMALL LETTER Y WITH DIAERESIS
+    LatinSmallLetterUWithGrave,      // Glyph 151 (('ù', 1)) = LATIN SMALL LETTER U WITH GRAVE
+    LatinSmallLetterYWithDiaeresis,  // Glyph 152 (('ÿ', 1)) = LATIN SMALL LETTER Y WITH DIAERESIS
     LatinCapitalLetterOWithDiaeresis, // Glyph 153 (('Ö', 1)) = LATIN CAPITAL LETTER O WITH DIAERESIS
     LatinCapitalLetterUWithDiaeresis, // Glyph 154 (('Ü', 1)) = LATIN CAPITAL LETTER U WITH DIAERESIS
-    LatinSmallLetterOWithStroke, // Glyph 155 (('ø', 1)) = LATIN SMALL LETTER O WITH STROKE
-    PoundSign, // Glyph 156 (('£', 1)) = POUND SIGN
-    LatinCapitalLetterOWithStroke, // Glyph 157 (('Ø', 1)) = LATIN CAPITAL LETTER O WITH STROKE
-    MultiplicationSign, // Glyph 158 (('×', 1)) = MULTIPLICATION SIGN
-    LatinSmallLetterFWithHook, // Glyph 159 (('ƒ', 1)) = LATIN SMALL LETTER F WITH HOOK
-    LatinSmallLetterAWithAcute, // Glyph 160 (('á', 1)) = LATIN SMALL LETTER A WITH ACUTE
-    LatinSmallLetterIWithAcute, // Glyph 161 (('í', 1)) = LATIN SMALL LETTER I WITH ACUTE
-    LatinSmallLetterOWithAcute, // Glyph 162 (('ó', 1)) = LATIN SMALL LETTER O WITH ACUTE
-    LatinSmallLetterUWithAcute, // Glyph 163 (('ú', 1)) = LATIN SMALL LETTER U WITH ACUTE
-    LatinSmallLetterNWithTilde, // Glyph 164 (('ñ', 1)) = LATIN SMALL LETTER N WITH TILDE
-    LatinCapitalLetterNWithTilde, // Glyph 165 (('Ñ', 1)) = LATIN CAPITAL LETTER N WITH TILDE
-    FeminineOrdinalIndicator, // Glyph 166 (('ª', 1)) = FEMININE ORDINAL INDICATOR
-    MasculineOrdinalIndicator, // Glyph 167 (('º', 1)) = MASCULINE ORDINAL INDICATOR
-    InvertedQuestionMark, // Glyph 168 (('¿', 1)) = INVERTED QUESTION MARK
-    RegisteredSign, // Glyph 169 (('®', 1)) = REGISTERED SIGN
-    NotSign, // Glyph 170 (('¬', 1)) = NOT SIGN
-    VulgarFractionOneHalf, // Glyph 171 (('½', 1)) = VULGAR FRACTION ONE HALF
-    VulgarFractionOneQuarter, // Glyph 172 (('¼', 1)) = VULGAR FRACTION ONE QUARTER
-    InvertedExclamationMark, // Glyph 173 (('¡', 1)) = INVERTED EXCLAMATION MARK
+    LatinSmallLetterOWithStroke,      // Glyph 155 (('ø', 1)) = LATIN SMALL LETTER O WITH STROKE
+    PoundSign,                        // Glyph 156 (('£', 1)) = POUND SIGN
+    LatinCapitalLetterOWithStroke,    // Glyph 157 (('Ø', 1)) = LATIN CAPITAL LETTER O WITH STROKE
+    MultiplicationSign,               // Glyph 158 (('×', 1)) = MULTIPLICATION SIGN
+    LatinSmallLetterFWithHook,        // Glyph 159 (('ƒ', 1)) = LATIN SMALL LETTER F WITH HOOK
+    LatinSmallLetterAWithAcute,       // Glyph 160 (('á', 1)) = LATIN SMALL LETTER A WITH ACUTE
+    LatinSmallLetterIWithAcute,       // Glyph 161 (('í', 1)) = LATIN SMALL LETTER I WITH ACUTE
+    LatinSmallLetterOWithAcute,       // Glyph 162 (('ó', 1)) = LATIN SMALL LETTER O WITH ACUTE
+    LatinSmallLetterUWithAcute,       // Glyph 163 (('ú', 1)) = LATIN SMALL LETTER U WITH ACUTE
+    LatinSmallLetterNWithTilde,       // Glyph 164 (('ñ', 1)) = LATIN SMALL LETTER N WITH TILDE
+    LatinCapitalLetterNWithTilde,     // Glyph 165 (('Ñ', 1)) = LATIN CAPITAL LETTER N WITH TILDE
+    FeminineOrdinalIndicator,         // Glyph 166 (('ª', 1)) = FEMININE ORDINAL INDICATOR
+    MasculineOrdinalIndicator,        // Glyph 167 (('º', 1)) = MASCULINE ORDINAL INDICATOR
+    InvertedQuestionMark,             // Glyph 168 (('¿', 1)) = INVERTED QUESTION MARK
+    RegisteredSign,                   // Glyph 169 (('®', 1)) = REGISTERED SIGN
+    NotSign,                          // Glyph 170 (('¬', 1)) = NOT SIGN
+    VulgarFractionOneHalf,            // Glyph 171 (('½', 1)) = VULGAR FRACTION ONE HALF
+    VulgarFractionOneQuarter,         // Glyph 172 (('¼', 1)) = VULGAR FRACTION ONE QUARTER
+    InvertedExclamationMark,          // Glyph 173 (('¡', 1)) = INVERTED EXCLAMATION MARK
     LeftPointingDoubleAngleQuotationMark, // Glyph 174 (('«', 1)) = LEFT-POINTING DOUBLE ANGLE QUOTATION MARK
     RightPointingDoubleAngleQuotationMark, // Glyph 175 (('»', 1)) = RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK
-    LightShade, // Glyph 176 (('░', 1)) = LIGHT SHADE
-    MediumShade, // Glyph 177 (('▒', 1)) = MEDIUM SHADE
-    DarkShade, // Glyph 178 (('▓', 1)) = DARK SHADE
-    BoxDrawingsLightVertical, // Glyph 179 (('│', 1)) = BOX DRAWINGS LIGHT VERTICAL
+    LightShade,                            // Glyph 176 (('░', 1)) = LIGHT SHADE
+    MediumShade,                           // Glyph 177 (('▒', 1)) = MEDIUM SHADE
+    DarkShade,                             // Glyph 178 (('▓', 1)) = DARK SHADE
+    BoxDrawingsLightVertical,              // Glyph 179 (('│', 1)) = BOX DRAWINGS LIGHT VERTICAL
     BoxDrawingsLightVerticalAndLeft, // Glyph 180 (('┤', 1)) = BOX DRAWINGS LIGHT VERTICAL AND LEFT
-    LatinCapitalLetterAWithAcute, // Glyph 181 (('Á', 1)) = LATIN CAPITAL LETTER A WITH ACUTE
+    LatinCapitalLetterAWithAcute,    // Glyph 181 (('Á', 1)) = LATIN CAPITAL LETTER A WITH ACUTE
     LatinCapitalLetterAWithCircumflex, // Glyph 182 (('Â', 1)) = LATIN CAPITAL LETTER A WITH CIRCUMFLEX
-    LatinCapitalLetterAWithGrave, // Glyph 183 (('À', 1)) = LATIN CAPITAL LETTER A WITH GRAVE
-    CopyrightSign, // Glyph 184 (('©', 1)) = COPYRIGHT SIGN
+    LatinCapitalLetterAWithGrave,      // Glyph 183 (('À', 1)) = LATIN CAPITAL LETTER A WITH GRAVE
+    CopyrightSign,                     // Glyph 184 (('©', 1)) = COPYRIGHT SIGN
     BoxDrawingsDoubleVerticalAndLeft, // Glyph 185 (('╣', 1)) = BOX DRAWINGS DOUBLE VERTICAL AND LEFT
-    BoxDrawingsDoubleVertical, // Glyph 186 (('║', 1)) = BOX DRAWINGS DOUBLE VERTICAL
-    BoxDrawingsDoubleDownAndLeft, // Glyph 187 (('╗', 1)) = BOX DRAWINGS DOUBLE DOWN AND LEFT
-    BoxDrawingsDoubleUpAndLeft, // Glyph 188 (('╝', 1)) = BOX DRAWINGS DOUBLE UP AND LEFT
-    CentSign, // Glyph 189 (('¢', 1)) = CENT SIGN
-    YenSign, // Glyph 190 (('¥', 1)) = YEN SIGN
-    BoxDrawingsLightDownAndLeft, // Glyph 191 (('┐', 1)) = BOX DRAWINGS LIGHT DOWN AND LEFT
-    BoxDrawingsLightUpAndRight, // Glyph 192 (('└', 1)) = BOX DRAWINGS LIGHT UP AND RIGHT
+    BoxDrawingsDoubleVertical,        // Glyph 186 (('║', 1)) = BOX DRAWINGS DOUBLE VERTICAL
+    BoxDrawingsDoubleDownAndLeft,     // Glyph 187 (('╗', 1)) = BOX DRAWINGS DOUBLE DOWN AND LEFT
+    BoxDrawingsDoubleUpAndLeft,       // Glyph 188 (('╝', 1)) = BOX DRAWINGS DOUBLE UP AND LEFT
+    CentSign,                         // Glyph 189 (('¢', 1)) = CENT SIGN
+    YenSign,                          // Glyph 190 (('¥', 1)) = YEN SIGN
+    BoxDrawingsLightDownAndLeft,      // Glyph 191 (('┐', 1)) = BOX DRAWINGS LIGHT DOWN AND LEFT
+    BoxDrawingsLightUpAndRight,       // Glyph 192 (('└', 1)) = BOX DRAWINGS LIGHT UP AND RIGHT
     BoxDrawingsLightUpAndHorizontal, // Glyph 193 (('┴', 1)) = BOX DRAWINGS LIGHT UP AND HORIZONTAL
     BoxDrawingsLightDownAndHorizontal, // Glyph 194 (('┬', 1)) = BOX DRAWINGS LIGHT DOWN AND HORIZONTAL
     BoxDrawingsLightVerticalAndRight, // Glyph 195 (('├', 1)) = BOX DRAWINGS LIGHT VERTICAL AND RIGHT
-    BoxDrawingsLightHorizontal, // Glyph 196 (('─', 1)) = BOX DRAWINGS LIGHT HORIZONTAL
+    BoxDrawingsLightHorizontal,       // Glyph 196 (('─', 1)) = BOX DRAWINGS LIGHT HORIZONTAL
     BoxDrawingsLightVerticalAndHorizontal, // Glyph 197 (('┼', 1)) = BOX DRAWINGS LIGHT VERTICAL AND HORIZONTAL
     LatinSmallLetterAWithTilde, // Glyph 198 (('ã', 1)) = LATIN SMALL LETTER A WITH TILDE
     LatinCapitalLetterAWithTilde, // Glyph 199 (('Ã', 1)) = LATIN CAPITAL LETTER A WITH TILDE
@@ -210,57 +210,57 @@ pub enum Glyph {
     BoxDrawingsDoubleUpAndHorizontal, // Glyph 202 (('╩', 1)) = BOX DRAWINGS DOUBLE UP AND HORIZONTAL
     BoxDrawingsDoubleDownAndHorizontal, // Glyph 203 (('╦', 1)) = BOX DRAWINGS DOUBLE DOWN AND HORIZONTAL
     BoxDrawingsDoubleVerticalAndRight, // Glyph 204 (('╠', 1)) = BOX DRAWINGS DOUBLE VERTICAL AND RIGHT
-    BoxDrawingsDoubleHorizontal, // Glyph 205 (('═', 1)) = BOX DRAWINGS DOUBLE HORIZONTAL
+    BoxDrawingsDoubleHorizontal,       // Glyph 205 (('═', 1)) = BOX DRAWINGS DOUBLE HORIZONTAL
     BoxDrawingsDoubleVerticalAndHorizontal, // Glyph 206 (('╬', 1)) = BOX DRAWINGS DOUBLE VERTICAL AND HORIZONTAL
-    CurrencySign, // Glyph 207 (('¤', 1)) = CURRENCY SIGN
-    LatinSmallLetterEth, // Glyph 208 (('ð', 1)) = LATIN SMALL LETTER ETH
-    LatinCapitalLetterEth, // Glyph 209 (('Ð', 1)) = LATIN CAPITAL LETTER ETH
+    CurrencySign,                           // Glyph 207 (('¤', 1)) = CURRENCY SIGN
+    LatinSmallLetterEth,                    // Glyph 208 (('ð', 1)) = LATIN SMALL LETTER ETH
+    LatinCapitalLetterEth,                  // Glyph 209 (('Ð', 1)) = LATIN CAPITAL LETTER ETH
     LatinCapitalLetterEWithCircumflex, // Glyph 210 (('Ê', 1)) = LATIN CAPITAL LETTER E WITH CIRCUMFLEX
     LatinCapitalLetterEWithDiaeresis, // Glyph 211 (('Ë', 1)) = LATIN CAPITAL LETTER E WITH DIAERESIS
-    LatinCapitalLetterEWithGrave, // Glyph 212 (('È', 1)) = LATIN CAPITAL LETTER E WITH GRAVE
-    LatinSmallLetterDotlessI, // Glyph 213 (('ı', 1)) = LATIN SMALL LETTER DOTLESS I
-    LatinCapitalLetterIWithAcute, // Glyph 214 (('Í', 1)) = LATIN CAPITAL LETTER I WITH ACUTE
+    LatinCapitalLetterEWithGrave,     // Glyph 212 (('È', 1)) = LATIN CAPITAL LETTER E WITH GRAVE
+    LatinSmallLetterDotlessI,         // Glyph 213 (('ı', 1)) = LATIN SMALL LETTER DOTLESS I
+    LatinCapitalLetterIWithAcute,     // Glyph 214 (('Í', 1)) = LATIN CAPITAL LETTER I WITH ACUTE
     LatinCapitalLetterIWithCircumflex, // Glyph 215 (('Î', 1)) = LATIN CAPITAL LETTER I WITH CIRCUMFLEX
     LatinCapitalLetterIWithDiaeresis, // Glyph 216 (('Ï', 1)) = LATIN CAPITAL LETTER I WITH DIAERESIS
-    BoxDrawingsLightUpAndLeft, // Glyph 217 (('┘', 1)) = BOX DRAWINGS LIGHT UP AND LEFT
-    BoxDrawingsLightDownAndRight, // Glyph 218 (('┌', 1)) = BOX DRAWINGS LIGHT DOWN AND RIGHT
-    FullBlock, // Glyph 219 (('█', 1)) = FULL BLOCK
-    LowerHalfBlock, // Glyph 220 (('▄', 1)) = LOWER HALF BLOCK
-    BrokenBar, // Glyph 221 (('¦', 1)) = BROKEN BAR
-    LatinCapitalLetterIWithGrave, // Glyph 222 (('Ì', 1)) = LATIN CAPITAL LETTER I WITH GRAVE
-    UpperHalfBlock, // Glyph 223 (('▀', 1)) = UPPER HALF BLOCK
-    LatinCapitalLetterOWithAcute, // Glyph 224 (('Ó', 1)) = LATIN CAPITAL LETTER O WITH ACUTE
-    LatinSmallLetterSharpS, // Glyph 225 (('ß', 1)) = LATIN SMALL LETTER SHARP S
+    BoxDrawingsLightUpAndLeft,        // Glyph 217 (('┘', 1)) = BOX DRAWINGS LIGHT UP AND LEFT
+    BoxDrawingsLightDownAndRight,     // Glyph 218 (('┌', 1)) = BOX DRAWINGS LIGHT DOWN AND RIGHT
+    FullBlock,                        // Glyph 219 (('█', 1)) = FULL BLOCK
+    LowerHalfBlock,                   // Glyph 220 (('▄', 1)) = LOWER HALF BLOCK
+    BrokenBar,                        // Glyph 221 (('¦', 1)) = BROKEN BAR
+    LatinCapitalLetterIWithGrave,     // Glyph 222 (('Ì', 1)) = LATIN CAPITAL LETTER I WITH GRAVE
+    UpperHalfBlock,                   // Glyph 223 (('▀', 1)) = UPPER HALF BLOCK
+    LatinCapitalLetterOWithAcute,     // Glyph 224 (('Ó', 1)) = LATIN CAPITAL LETTER O WITH ACUTE
+    LatinSmallLetterSharpS,           // Glyph 225 (('ß', 1)) = LATIN SMALL LETTER SHARP S
     LatinCapitalLetterOWithCircumflex, // Glyph 226 (('Ô', 1)) = LATIN CAPITAL LETTER O WITH CIRCUMFLEX
-    LatinCapitalLetterOWithGrave, // Glyph 227 (('Ò', 1)) = LATIN CAPITAL LETTER O WITH GRAVE
-    LatinSmallLetterOWithTilde, // Glyph 228 (('õ', 1)) = LATIN SMALL LETTER O WITH TILDE
-    LatinCapitalLetterOWithTilde, // Glyph 229 (('Õ', 1)) = LATIN CAPITAL LETTER O WITH TILDE
-    MicroSign, // Glyph 230 (('µ', 1)) = MICRO SIGN
-    LatinSmallLetterThorn, // Glyph 231 (('þ', 1)) = LATIN SMALL LETTER THORN
-    LatinCapitalLetterThorn, // Glyph 232 (('Þ', 1)) = LATIN CAPITAL LETTER THORN
-    LatinCapitalLetterUWithAcute, // Glyph 233 (('Ú', 1)) = LATIN CAPITAL LETTER U WITH ACUTE
+    LatinCapitalLetterOWithGrave,      // Glyph 227 (('Ò', 1)) = LATIN CAPITAL LETTER O WITH GRAVE
+    LatinSmallLetterOWithTilde,        // Glyph 228 (('õ', 1)) = LATIN SMALL LETTER O WITH TILDE
+    LatinCapitalLetterOWithTilde,      // Glyph 229 (('Õ', 1)) = LATIN CAPITAL LETTER O WITH TILDE
+    MicroSign,                         // Glyph 230 (('µ', 1)) = MICRO SIGN
+    LatinSmallLetterThorn,             // Glyph 231 (('þ', 1)) = LATIN SMALL LETTER THORN
+    LatinCapitalLetterThorn,           // Glyph 232 (('Þ', 1)) = LATIN CAPITAL LETTER THORN
+    LatinCapitalLetterUWithAcute,      // Glyph 233 (('Ú', 1)) = LATIN CAPITAL LETTER U WITH ACUTE
     LatinCapitalLetterUWithCircumflex, // Glyph 234 (('Û', 1)) = LATIN CAPITAL LETTER U WITH CIRCUMFLEX
-    LatinCapitalLetterUWithGrave, // Glyph 235 (('Ù', 1)) = LATIN CAPITAL LETTER U WITH GRAVE
-    LatinSmallLetterYWithAcute, // Glyph 236 (('ý', 1)) = LATIN SMALL LETTER Y WITH ACUTE
-    LatinCapitalLetterYWithAcute, // Glyph 237 (('Ý', 1)) = LATIN CAPITAL LETTER Y WITH ACUTE
-    Macron, // Glyph 238 (('¯', 1)) = MACRON
-    AcuteAccent, // Glyph 239 (('´', 1)) = ACUTE ACCENT
-    SoftHyphen, // Glyph 240 (('\xad', 1)) = SOFT HYPHEN
-    PlusMinusSign, // Glyph 241 (('±', 1)) = PLUS-MINUS SIGN
-    DoubleLowLine, // Glyph 242 (('‗', 1)) = DOUBLE LOW LINE
-    VulgarFractionThreeQuarters, // Glyph 243 (('¾', 1)) = VULGAR FRACTION THREE QUARTERS
-    PilcrowSign, // Glyph 244 (('¶', 1)) = PILCROW SIGN
-    SectionSign, // Glyph 245 (('§', 1)) = SECTION SIGN
-    DivisionSign, // Glyph 246 (('÷', 1)) = DIVISION SIGN
-    Cedilla, // Glyph 247 (('¸', 1)) = CEDILLA
-    DegreeSign, // Glyph 248 (('°', 1)) = DEGREE SIGN
-    Diaeresis, // Glyph 249 (('¨', 1)) = DIAERESIS
-    MiddleDot, // Glyph 250 (('·', 1)) = MIDDLE DOT
-    SuperscriptOne, // Glyph 251 (('¹', 1)) = SUPERSCRIPT ONE
-    SuperscriptThree, // Glyph 252 (('³', 1)) = SUPERSCRIPT THREE
-    SuperscriptTwo, // Glyph 253 (('²', 1)) = SUPERSCRIPT TWO
-    BlackSquare, // Glyph 254 (('■', 1)) = BLACK SQUARE
-    NoBreakSpace, // Glyph 255 (('\xa0', 1)) = NO-BREAK SPACE
+    LatinCapitalLetterUWithGrave,      // Glyph 235 (('Ù', 1)) = LATIN CAPITAL LETTER U WITH GRAVE
+    LatinSmallLetterYWithAcute,        // Glyph 236 (('ý', 1)) = LATIN SMALL LETTER Y WITH ACUTE
+    LatinCapitalLetterYWithAcute,      // Glyph 237 (('Ý', 1)) = LATIN CAPITAL LETTER Y WITH ACUTE
+    Macron,                            // Glyph 238 (('¯', 1)) = MACRON
+    AcuteAccent,                       // Glyph 239 (('´', 1)) = ACUTE ACCENT
+    SoftHyphen,                        // Glyph 240 (('\xad', 1)) = SOFT HYPHEN
+    PlusMinusSign,                     // Glyph 241 (('±', 1)) = PLUS-MINUS SIGN
+    DoubleLowLine,                     // Glyph 242 (('‗', 1)) = DOUBLE LOW LINE
+    VulgarFractionThreeQuarters,       // Glyph 243 (('¾', 1)) = VULGAR FRACTION THREE QUARTERS
+    PilcrowSign,                       // Glyph 244 (('¶', 1)) = PILCROW SIGN
+    SectionSign,                       // Glyph 245 (('§', 1)) = SECTION SIGN
+    DivisionSign,                      // Glyph 246 (('÷', 1)) = DIVISION SIGN
+    Cedilla,                           // Glyph 247 (('¸', 1)) = CEDILLA
+    DegreeSign,                        // Glyph 248 (('°', 1)) = DEGREE SIGN
+    Diaeresis,                         // Glyph 249 (('¨', 1)) = DIAERESIS
+    MiddleDot,                         // Glyph 250 (('·', 1)) = MIDDLE DOT
+    SuperscriptOne,                    // Glyph 251 (('¹', 1)) = SUPERSCRIPT ONE
+    SuperscriptThree,                  // Glyph 252 (('³', 1)) = SUPERSCRIPT THREE
+    SuperscriptTwo,                    // Glyph 253 (('²', 1)) = SUPERSCRIPT TWO
+    BlackSquare,                       // Glyph 254 (('■', 1)) = BLACK SQUARE
+    NoBreakSpace,                      // Glyph 255 (('\xa0', 1)) = NO-BREAK SPACE
 }
 
 impl ::core::default::Default for Glyph {
@@ -560,71 +560,71 @@ pub const FONT_DATA: [u8; 256 * 16] = [
 impl Glyph {
     pub fn map_char(ch: char) -> Glyph {
         match ch {
-            '\u{0000}' => Glyph::Null, // Glyph 0 (('\x00', 1)) = UNKNOWN
-            '\u{0001}' => Glyph::SOH, // Glyph 1 (('\x01', 1)) = UNKNOWN
-            '\u{0002}' => Glyph::STX, // Glyph 2 (('\x02', 1)) = UNKNOWN
-            '\u{0003}' => Glyph::ETX, // Glyph 3 (('\x03', 1)) = UNKNOWN
-            '\u{0004}' => Glyph::EOT, // Glyph 4 (('\x04', 1)) = UNKNOWN
-            '\u{0005}' => Glyph::ENQ, // Glyph 5 (('\x05', 1)) = UNKNOWN
-            '\u{0006}' => Glyph::ACK, // Glyph 6 (('\x06', 1)) = UNKNOWN
-            '\u{0007}' => Glyph::BEL, // Glyph 7 (('\x07', 1)) = UNKNOWN
-            '\u{0008}' => Glyph::BS, // Glyph 8 (('\x08', 1)) = UNKNOWN
-            '\t' => Glyph::HT, // Glyph 9 (('\t', 1)) = UNKNOWN
-            '\n' => Glyph::LF, // Glyph 10 (('\n', 1)) = UNKNOWN
-            '\u{000b}' => Glyph::VT, // Glyph 11 (('\x0b', 1)) = UNKNOWN
-            '\u{000c}' => Glyph::FF, // Glyph 12 (('\x0c', 1)) = UNKNOWN
-            '\r' => Glyph::CR, // Glyph 13 (('\r', 1)) = UNKNOWN
-            '\u{000e}' => Glyph::SO, // Glyph 14 (('\x0e', 1)) = UNKNOWN
-            '\u{000f}' => Glyph::SI, // Glyph 15 (('\x0f', 1)) = UNKNOWN
-            '\u{0010}' => Glyph::DLE, // Glyph 16 (('\x10', 1)) = UNKNOWN
-            '\u{0011}' => Glyph::DC1, // Glyph 17 (('\x11', 1)) = UNKNOWN
-            '\u{0012}' => Glyph::DC2, // Glyph 18 (('\x12', 1)) = UNKNOWN
-            '\u{0013}' => Glyph::DC3, // Glyph 19 (('\x13', 1)) = UNKNOWN
-            '\u{0014}' => Glyph::DC4, // Glyph 20 (('\x14', 1)) = UNKNOWN
-            '\u{0015}' => Glyph::NAK, // Glyph 21 (('\x15', 1)) = UNKNOWN
-            '\u{0016}' => Glyph::SYN, // Glyph 22 (('\x16', 1)) = UNKNOWN
-            '\u{0017}' => Glyph::ETB, // Glyph 23 (('\x17', 1)) = UNKNOWN
-            '\u{0018}' => Glyph::CAN, // Glyph 24 (('\x18', 1)) = UNKNOWN
-            '\u{0019}' => Glyph::EM, // Glyph 25 (('\x19', 1)) = UNKNOWN
-            '\u{001a}' => Glyph::SUB, // Glyph 26 (('\x1a', 1)) = UNKNOWN
-            '\u{001b}' => Glyph::Escape, // Glyph 27 (('\x1b', 1)) = UNKNOWN
-            '\u{001c}' => Glyph::FS, // Glyph 28 (('\x1c', 1)) = UNKNOWN
-            '\u{001d}' => Glyph::GS, // Glyph 29 (('\x1d', 1)) = UNKNOWN
-            '\u{001e}' => Glyph::RS, // Glyph 30 (('\x1e', 1)) = UNKNOWN
-            '\u{001f}' => Glyph::US, // Glyph 31 (('\x1f', 1)) = UNKNOWN
-            ' ' => Glyph::Space, // Glyph 32 ((' ', 1)) = SPACE
-            '!' => Glyph::ExclamationMark, // Glyph 33 (('!', 1)) = EXCLAMATION MARK
-            '"' => Glyph::QuotationMark, // Glyph 34 (('"', 1)) = QUOTATION MARK
-            '#' => Glyph::NumberSign, // Glyph 35 (('#', 1)) = NUMBER SIGN
-            '$' => Glyph::DollarSign, // Glyph 36 (('$', 1)) = DOLLAR SIGN
-            '%' => Glyph::PercentSign, // Glyph 37 (('%', 1)) = PERCENT SIGN
-            '&' => Glyph::Ampersand, // Glyph 38 (('&', 1)) = AMPERSAND
-            '\'' => Glyph::Apostrophe, // Glyph 39 (("'", 1)) = APOSTROPHE
-            '(' => Glyph::LeftParenthesis, // Glyph 40 (('(', 1)) = LEFT PARENTHESIS
-            ')' => Glyph::RightParenthesis, // Glyph 41 ((')', 1)) = RIGHT PARENTHESIS
-            '*' => Glyph::Asterisk, // Glyph 42 (('*', 1)) = ASTERISK
-            '+' => Glyph::PlusSign, // Glyph 43 (('+', 1)) = PLUS SIGN
-            ',' => Glyph::Comma, // Glyph 44 ((',', 1)) = COMMA
-            '-' => Glyph::HyphenMinus, // Glyph 45 (('-', 1)) = HYPHEN-MINUS
-            '.' => Glyph::FullStop, // Glyph 46 (('.', 1)) = FULL STOP
-            '/' => Glyph::Solidus, // Glyph 47 (('/', 1)) = SOLIDUS
-            '0' => Glyph::DigitZero, // Glyph 48 (('0', 1)) = DIGIT ZERO
-            '1' => Glyph::DigitOne, // Glyph 49 (('1', 1)) = DIGIT ONE
-            '2' => Glyph::DigitTwo, // Glyph 50 (('2', 1)) = DIGIT TWO
-            '3' => Glyph::DigitThree, // Glyph 51 (('3', 1)) = DIGIT THREE
-            '4' => Glyph::DigitFour, // Glyph 52 (('4', 1)) = DIGIT FOUR
-            '5' => Glyph::DigitFive, // Glyph 53 (('5', 1)) = DIGIT FIVE
-            '6' => Glyph::DigitSix, // Glyph 54 (('6', 1)) = DIGIT SIX
-            '7' => Glyph::DigitSeven, // Glyph 55 (('7', 1)) = DIGIT SEVEN
-            '8' => Glyph::DigitEight, // Glyph 56 (('8', 1)) = DIGIT EIGHT
-            '9' => Glyph::DigitNine, // Glyph 57 (('9', 1)) = DIGIT NINE
-            ':' => Glyph::Colon, // Glyph 58 ((':', 1)) = COLON
-            ';' => Glyph::Semicolon, // Glyph 59 ((';', 1)) = SEMICOLON
-            '<' => Glyph::LessThanSign, // Glyph 60 (('<', 1)) = LESS-THAN SIGN
-            '=' => Glyph::EqualsSign, // Glyph 61 (('=', 1)) = EQUALS SIGN
-            '>' => Glyph::GreaterThanSign, // Glyph 62 (('>', 1)) = GREATER-THAN SIGN
-            '?' => Glyph::QuestionMark, // Glyph 63 (('?', 1)) = QUESTION MARK
-            '@' => Glyph::CommercialAt, // Glyph 64 (('@', 1)) = COMMERCIAL AT
+            '\u{0000}' => Glyph::Null,         // Glyph 0 (('\x00', 1)) = UNKNOWN
+            '\u{0001}' => Glyph::SOH,          // Glyph 1 (('\x01', 1)) = UNKNOWN
+            '\u{0002}' => Glyph::STX,          // Glyph 2 (('\x02', 1)) = UNKNOWN
+            '\u{0003}' => Glyph::ETX,          // Glyph 3 (('\x03', 1)) = UNKNOWN
+            '\u{0004}' => Glyph::EOT,          // Glyph 4 (('\x04', 1)) = UNKNOWN
+            '\u{0005}' => Glyph::ENQ,          // Glyph 5 (('\x05', 1)) = UNKNOWN
+            '\u{0006}' => Glyph::ACK,          // Glyph 6 (('\x06', 1)) = UNKNOWN
+            '\u{0007}' => Glyph::BEL,          // Glyph 7 (('\x07', 1)) = UNKNOWN
+            '\u{0008}' => Glyph::BS,           // Glyph 8 (('\x08', 1)) = UNKNOWN
+            '\t' => Glyph::HT,                 // Glyph 9 (('\t', 1)) = UNKNOWN
+            '\n' => Glyph::LF,                 // Glyph 10 (('\n', 1)) = UNKNOWN
+            '\u{000b}' => Glyph::VT,           // Glyph 11 (('\x0b', 1)) = UNKNOWN
+            '\u{000c}' => Glyph::FF,           // Glyph 12 (('\x0c', 1)) = UNKNOWN
+            '\r' => Glyph::CR,                 // Glyph 13 (('\r', 1)) = UNKNOWN
+            '\u{000e}' => Glyph::SO,           // Glyph 14 (('\x0e', 1)) = UNKNOWN
+            '\u{000f}' => Glyph::SI,           // Glyph 15 (('\x0f', 1)) = UNKNOWN
+            '\u{0010}' => Glyph::DLE,          // Glyph 16 (('\x10', 1)) = UNKNOWN
+            '\u{0011}' => Glyph::DC1,          // Glyph 17 (('\x11', 1)) = UNKNOWN
+            '\u{0012}' => Glyph::DC2,          // Glyph 18 (('\x12', 1)) = UNKNOWN
+            '\u{0013}' => Glyph::DC3,          // Glyph 19 (('\x13', 1)) = UNKNOWN
+            '\u{0014}' => Glyph::DC4,          // Glyph 20 (('\x14', 1)) = UNKNOWN
+            '\u{0015}' => Glyph::NAK,          // Glyph 21 (('\x15', 1)) = UNKNOWN
+            '\u{0016}' => Glyph::SYN,          // Glyph 22 (('\x16', 1)) = UNKNOWN
+            '\u{0017}' => Glyph::ETB,          // Glyph 23 (('\x17', 1)) = UNKNOWN
+            '\u{0018}' => Glyph::CAN,          // Glyph 24 (('\x18', 1)) = UNKNOWN
+            '\u{0019}' => Glyph::EM,           // Glyph 25 (('\x19', 1)) = UNKNOWN
+            '\u{001a}' => Glyph::SUB,          // Glyph 26 (('\x1a', 1)) = UNKNOWN
+            '\u{001b}' => Glyph::Escape,       // Glyph 27 (('\x1b', 1)) = UNKNOWN
+            '\u{001c}' => Glyph::FS,           // Glyph 28 (('\x1c', 1)) = UNKNOWN
+            '\u{001d}' => Glyph::GS,           // Glyph 29 (('\x1d', 1)) = UNKNOWN
+            '\u{001e}' => Glyph::RS,           // Glyph 30 (('\x1e', 1)) = UNKNOWN
+            '\u{001f}' => Glyph::US,           // Glyph 31 (('\x1f', 1)) = UNKNOWN
+            ' ' => Glyph::Space,               // Glyph 32 ((' ', 1)) = SPACE
+            '!' => Glyph::ExclamationMark,     // Glyph 33 (('!', 1)) = EXCLAMATION MARK
+            '"' => Glyph::QuotationMark,       // Glyph 34 (('"', 1)) = QUOTATION MARK
+            '#' => Glyph::NumberSign,          // Glyph 35 (('#', 1)) = NUMBER SIGN
+            '$' => Glyph::DollarSign,          // Glyph 36 (('$', 1)) = DOLLAR SIGN
+            '%' => Glyph::PercentSign,         // Glyph 37 (('%', 1)) = PERCENT SIGN
+            '&' => Glyph::Ampersand,           // Glyph 38 (('&', 1)) = AMPERSAND
+            '\'' => Glyph::Apostrophe,         // Glyph 39 (("'", 1)) = APOSTROPHE
+            '(' => Glyph::LeftParenthesis,     // Glyph 40 (('(', 1)) = LEFT PARENTHESIS
+            ')' => Glyph::RightParenthesis,    // Glyph 41 ((')', 1)) = RIGHT PARENTHESIS
+            '*' => Glyph::Asterisk,            // Glyph 42 (('*', 1)) = ASTERISK
+            '+' => Glyph::PlusSign,            // Glyph 43 (('+', 1)) = PLUS SIGN
+            ',' => Glyph::Comma,               // Glyph 44 ((',', 1)) = COMMA
+            '-' => Glyph::HyphenMinus,         // Glyph 45 (('-', 1)) = HYPHEN-MINUS
+            '.' => Glyph::FullStop,            // Glyph 46 (('.', 1)) = FULL STOP
+            '/' => Glyph::Solidus,             // Glyph 47 (('/', 1)) = SOLIDUS
+            '0' => Glyph::DigitZero,           // Glyph 48 (('0', 1)) = DIGIT ZERO
+            '1' => Glyph::DigitOne,            // Glyph 49 (('1', 1)) = DIGIT ONE
+            '2' => Glyph::DigitTwo,            // Glyph 50 (('2', 1)) = DIGIT TWO
+            '3' => Glyph::DigitThree,          // Glyph 51 (('3', 1)) = DIGIT THREE
+            '4' => Glyph::DigitFour,           // Glyph 52 (('4', 1)) = DIGIT FOUR
+            '5' => Glyph::DigitFive,           // Glyph 53 (('5', 1)) = DIGIT FIVE
+            '6' => Glyph::DigitSix,            // Glyph 54 (('6', 1)) = DIGIT SIX
+            '7' => Glyph::DigitSeven,          // Glyph 55 (('7', 1)) = DIGIT SEVEN
+            '8' => Glyph::DigitEight,          // Glyph 56 (('8', 1)) = DIGIT EIGHT
+            '9' => Glyph::DigitNine,           // Glyph 57 (('9', 1)) = DIGIT NINE
+            ':' => Glyph::Colon,               // Glyph 58 ((':', 1)) = COLON
+            ';' => Glyph::Semicolon,           // Glyph 59 ((';', 1)) = SEMICOLON
+            '<' => Glyph::LessThanSign,        // Glyph 60 (('<', 1)) = LESS-THAN SIGN
+            '=' => Glyph::EqualsSign,          // Glyph 61 (('=', 1)) = EQUALS SIGN
+            '>' => Glyph::GreaterThanSign,     // Glyph 62 (('>', 1)) = GREATER-THAN SIGN
+            '?' => Glyph::QuestionMark,        // Glyph 63 (('?', 1)) = QUESTION MARK
+            '@' => Glyph::CommercialAt,        // Glyph 64 (('@', 1)) = COMMERCIAL AT
             'A' => Glyph::LatinCapitalLetterA, // Glyph 65 (('A', 1)) = LATIN CAPITAL LETTER A
             'B' => Glyph::LatinCapitalLetterB, // Glyph 66 (('B', 1)) = LATIN CAPITAL LETTER B
             'C' => Glyph::LatinCapitalLetterC, // Glyph 67 (('C', 1)) = LATIN CAPITAL LETTER C
@@ -651,43 +651,43 @@ impl Glyph {
             'X' => Glyph::LatinCapitalLetterX, // Glyph 88 (('X', 1)) = LATIN CAPITAL LETTER X
             'Y' => Glyph::LatinCapitalLetterY, // Glyph 89 (('Y', 1)) = LATIN CAPITAL LETTER Y
             'Z' => Glyph::LatinCapitalLetterZ, // Glyph 90 (('Z', 1)) = LATIN CAPITAL LETTER Z
-            '[' => Glyph::LeftSquareBracket, // Glyph 91 (('[', 1)) = LEFT SQUARE BRACKET
-            '\\' => Glyph::ReverseSolidus, // Glyph 92 (('\\', 1)) = REVERSE SOLIDUS
-            ']' => Glyph::RightSquareBracket, // Glyph 93 ((']', 1)) = RIGHT SQUARE BRACKET
-            '^' => Glyph::CircumflexAccent, // Glyph 94 (('^', 1)) = CIRCUMFLEX ACCENT
-            '_' => Glyph::LowLine, // Glyph 95 (('_', 1)) = LOW LINE
-            '`' => Glyph::GraveAccent, // Glyph 96 (('`', 1)) = GRAVE ACCENT
-            'a' => Glyph::LatinSmallLetterA, // Glyph 97 (('a', 1)) = LATIN SMALL LETTER A
-            'b' => Glyph::LatinSmallLetterB, // Glyph 98 (('b', 1)) = LATIN SMALL LETTER B
-            'c' => Glyph::LatinSmallLetterC, // Glyph 99 (('c', 1)) = LATIN SMALL LETTER C
-            'd' => Glyph::LatinSmallLetterD, // Glyph 100 (('d', 1)) = LATIN SMALL LETTER D
-            'e' => Glyph::LatinSmallLetterE, // Glyph 101 (('e', 1)) = LATIN SMALL LETTER E
-            'f' => Glyph::LatinSmallLetterF, // Glyph 102 (('f', 1)) = LATIN SMALL LETTER F
-            'g' => Glyph::LatinSmallLetterG, // Glyph 103 (('g', 1)) = LATIN SMALL LETTER G
-            'h' => Glyph::LatinSmallLetterH, // Glyph 104 (('h', 1)) = LATIN SMALL LETTER H
-            'i' => Glyph::LatinSmallLetterI, // Glyph 105 (('i', 1)) = LATIN SMALL LETTER I
-            'j' => Glyph::LatinSmallLetterJ, // Glyph 106 (('j', 1)) = LATIN SMALL LETTER J
-            'k' => Glyph::LatinSmallLetterK, // Glyph 107 (('k', 1)) = LATIN SMALL LETTER K
-            'l' => Glyph::LatinSmallLetterL, // Glyph 108 (('l', 1)) = LATIN SMALL LETTER L
-            'm' => Glyph::LatinSmallLetterM, // Glyph 109 (('m', 1)) = LATIN SMALL LETTER M
-            'n' => Glyph::LatinSmallLetterN, // Glyph 110 (('n', 1)) = LATIN SMALL LETTER N
-            'o' => Glyph::LatinSmallLetterO, // Glyph 111 (('o', 1)) = LATIN SMALL LETTER O
-            'p' => Glyph::LatinSmallLetterP, // Glyph 112 (('p', 1)) = LATIN SMALL LETTER P
-            'q' => Glyph::LatinSmallLetterQ, // Glyph 113 (('q', 1)) = LATIN SMALL LETTER Q
-            'r' => Glyph::LatinSmallLetterR, // Glyph 114 (('r', 1)) = LATIN SMALL LETTER R
-            's' => Glyph::LatinSmallLetterS, // Glyph 115 (('s', 1)) = LATIN SMALL LETTER S
-            't' => Glyph::LatinSmallLetterT, // Glyph 116 (('t', 1)) = LATIN SMALL LETTER T
-            'u' => Glyph::LatinSmallLetterU, // Glyph 117 (('u', 1)) = LATIN SMALL LETTER U
-            'v' => Glyph::LatinSmallLetterV, // Glyph 118 (('v', 1)) = LATIN SMALL LETTER V
-            'w' => Glyph::LatinSmallLetterW, // Glyph 119 (('w', 1)) = LATIN SMALL LETTER W
-            'x' => Glyph::LatinSmallLetterX, // Glyph 120 (('x', 1)) = LATIN SMALL LETTER X
-            'y' => Glyph::LatinSmallLetterY, // Glyph 121 (('y', 1)) = LATIN SMALL LETTER Y
-            'z' => Glyph::LatinSmallLetterZ, // Glyph 122 (('z', 1)) = LATIN SMALL LETTER Z
-            '{' => Glyph::LeftCurlyBracket, // Glyph 123 (('{', 1)) = LEFT CURLY BRACKET
-            '|' => Glyph::VerticalLine, // Glyph 124 (('|', 1)) = VERTICAL LINE
-            '}' => Glyph::RightCurlyBracket, // Glyph 125 (('}', 1)) = RIGHT CURLY BRACKET
-            '~' => Glyph::Tilde, // Glyph 126 (('~', 1)) = TILDE
-            '\u{007f}' => Glyph::Delete, // Glyph 127 (('\x7f', 1)) = DELETE
+            '[' => Glyph::LeftSquareBracket,   // Glyph 91 (('[', 1)) = LEFT SQUARE BRACKET
+            '\\' => Glyph::ReverseSolidus,     // Glyph 92 (('\\', 1)) = REVERSE SOLIDUS
+            ']' => Glyph::RightSquareBracket,  // Glyph 93 ((']', 1)) = RIGHT SQUARE BRACKET
+            '^' => Glyph::CircumflexAccent,    // Glyph 94 (('^', 1)) = CIRCUMFLEX ACCENT
+            '_' => Glyph::LowLine,             // Glyph 95 (('_', 1)) = LOW LINE
+            '`' => Glyph::GraveAccent,         // Glyph 96 (('`', 1)) = GRAVE ACCENT
+            'a' => Glyph::LatinSmallLetterA,   // Glyph 97 (('a', 1)) = LATIN SMALL LETTER A
+            'b' => Glyph::LatinSmallLetterB,   // Glyph 98 (('b', 1)) = LATIN SMALL LETTER B
+            'c' => Glyph::LatinSmallLetterC,   // Glyph 99 (('c', 1)) = LATIN SMALL LETTER C
+            'd' => Glyph::LatinSmallLetterD,   // Glyph 100 (('d', 1)) = LATIN SMALL LETTER D
+            'e' => Glyph::LatinSmallLetterE,   // Glyph 101 (('e', 1)) = LATIN SMALL LETTER E
+            'f' => Glyph::LatinSmallLetterF,   // Glyph 102 (('f', 1)) = LATIN SMALL LETTER F
+            'g' => Glyph::LatinSmallLetterG,   // Glyph 103 (('g', 1)) = LATIN SMALL LETTER G
+            'h' => Glyph::LatinSmallLetterH,   // Glyph 104 (('h', 1)) = LATIN SMALL LETTER H
+            'i' => Glyph::LatinSmallLetterI,   // Glyph 105 (('i', 1)) = LATIN SMALL LETTER I
+            'j' => Glyph::LatinSmallLetterJ,   // Glyph 106 (('j', 1)) = LATIN SMALL LETTER J
+            'k' => Glyph::LatinSmallLetterK,   // Glyph 107 (('k', 1)) = LATIN SMALL LETTER K
+            'l' => Glyph::LatinSmallLetterL,   // Glyph 108 (('l', 1)) = LATIN SMALL LETTER L
+            'm' => Glyph::LatinSmallLetterM,   // Glyph 109 (('m', 1)) = LATIN SMALL LETTER M
+            'n' => Glyph::LatinSmallLetterN,   // Glyph 110 (('n', 1)) = LATIN SMALL LETTER N
+            'o' => Glyph::LatinSmallLetterO,   // Glyph 111 (('o', 1)) = LATIN SMALL LETTER O
+            'p' => Glyph::LatinSmallLetterP,   // Glyph 112 (('p', 1)) = LATIN SMALL LETTER P
+            'q' => Glyph::LatinSmallLetterQ,   // Glyph 113 (('q', 1)) = LATIN SMALL LETTER Q
+            'r' => Glyph::LatinSmallLetterR,   // Glyph 114 (('r', 1)) = LATIN SMALL LETTER R
+            's' => Glyph::LatinSmallLetterS,   // Glyph 115 (('s', 1)) = LATIN SMALL LETTER S
+            't' => Glyph::LatinSmallLetterT,   // Glyph 116 (('t', 1)) = LATIN SMALL LETTER T
+            'u' => Glyph::LatinSmallLetterU,   // Glyph 117 (('u', 1)) = LATIN SMALL LETTER U
+            'v' => Glyph::LatinSmallLetterV,   // Glyph 118 (('v', 1)) = LATIN SMALL LETTER V
+            'w' => Glyph::LatinSmallLetterW,   // Glyph 119 (('w', 1)) = LATIN SMALL LETTER W
+            'x' => Glyph::LatinSmallLetterX,   // Glyph 120 (('x', 1)) = LATIN SMALL LETTER X
+            'y' => Glyph::LatinSmallLetterY,   // Glyph 121 (('y', 1)) = LATIN SMALL LETTER Y
+            'z' => Glyph::LatinSmallLetterZ,   // Glyph 122 (('z', 1)) = LATIN SMALL LETTER Z
+            '{' => Glyph::LeftCurlyBracket,    // Glyph 123 (('{', 1)) = LEFT CURLY BRACKET
+            '|' => Glyph::VerticalLine,        // Glyph 124 (('|', 1)) = VERTICAL LINE
+            '}' => Glyph::RightCurlyBracket,   // Glyph 125 (('}', 1)) = RIGHT CURLY BRACKET
+            '~' => Glyph::Tilde,               // Glyph 126 (('~', 1)) = TILDE
+            '\u{007f}' => Glyph::Delete,       // Glyph 127 (('\x7f', 1)) = DELETE
             'Ç' => Glyph::LatinCapitalLetterCWithCedilla, // Glyph 128 (('Ç', 1)) = LATIN CAPITAL LETTER C WITH CEDILLA
             'ü' => Glyph::LatinSmallLetterUWithDiaeresis, // Glyph 129 (('ü', 1)) = LATIN SMALL LETTER U WITH DIAERESIS
             'é' => Glyph::LatinSmallLetterEWithAcute, // Glyph 130 (('é', 1)) = LATIN SMALL LETTER E WITH ACUTE
@@ -716,7 +716,7 @@ impl Glyph {
             'Ö' => Glyph::LatinCapitalLetterOWithDiaeresis, // Glyph 153 (('Ö', 1)) = LATIN CAPITAL LETTER O WITH DIAERESIS
             'Ü' => Glyph::LatinCapitalLetterUWithDiaeresis, // Glyph 154 (('Ü', 1)) = LATIN CAPITAL LETTER U WITH DIAERESIS
             'ø' => Glyph::LatinSmallLetterOWithStroke, // Glyph 155 (('ø', 1)) = LATIN SMALL LETTER O WITH STROKE
-            '£' => Glyph::PoundSign, // Glyph 156 (('£', 1)) = POUND SIGN
+            '£' => Glyph::PoundSign,                   // Glyph 156 (('£', 1)) = POUND SIGN
             'Ø' => Glyph::LatinCapitalLetterOWithStroke, // Glyph 157 (('Ø', 1)) = LATIN CAPITAL LETTER O WITH STROKE
             '×' => Glyph::MultiplicationSign, // Glyph 158 (('×', 1)) = MULTIPLICATION SIGN
             'ƒ' => Glyph::LatinSmallLetterFWithHook, // Glyph 159 (('ƒ', 1)) = LATIN SMALL LETTER F WITH HOOK
@@ -729,8 +729,8 @@ impl Glyph {
             'ª' => Glyph::FeminineOrdinalIndicator, // Glyph 166 (('ª', 1)) = FEMININE ORDINAL INDICATOR
             'º' => Glyph::MasculineOrdinalIndicator, // Glyph 167 (('º', 1)) = MASCULINE ORDINAL INDICATOR
             '¿' => Glyph::InvertedQuestionMark, // Glyph 168 (('¿', 1)) = INVERTED QUESTION MARK
-            '®' => Glyph::RegisteredSign, // Glyph 169 (('®', 1)) = REGISTERED SIGN
-            '¬' => Glyph::NotSign, // Glyph 170 (('¬', 1)) = NOT SIGN
+            '®' => Glyph::RegisteredSign,       // Glyph 169 (('®', 1)) = REGISTERED SIGN
+            '¬' => Glyph::NotSign,              // Glyph 170 (('¬', 1)) = NOT SIGN
             '½' => Glyph::VulgarFractionOneHalf, // Glyph 171 (('½', 1)) = VULGAR FRACTION ONE HALF
             '¼' => Glyph::VulgarFractionOneQuarter, // Glyph 172 (('¼', 1)) = VULGAR FRACTION ONE QUARTER
             '¡' => Glyph::InvertedExclamationMark, // Glyph 173 (('¡', 1)) = INVERTED EXCLAMATION MARK
@@ -738,19 +738,19 @@ impl Glyph {
             '»' => Glyph::RightPointingDoubleAngleQuotationMark, // Glyph 175 (('»', 1)) = RIGHT-POINTING DOUBLE ANGLE QUOTATION MARK
             '░' => Glyph::LightShade, // Glyph 176 (('░', 1)) = LIGHT SHADE
             '▒' => Glyph::MediumShade, // Glyph 177 (('▒', 1)) = MEDIUM SHADE
-            '▓' => Glyph::DarkShade, // Glyph 178 (('▓', 1)) = DARK SHADE
+            '▓' => Glyph::DarkShade,  // Glyph 178 (('▓', 1)) = DARK SHADE
             '│' => Glyph::BoxDrawingsLightVertical, // Glyph 179 (('│', 1)) = BOX DRAWINGS LIGHT VERTICAL
             '┤' => Glyph::BoxDrawingsLightVerticalAndLeft, // Glyph 180 (('┤', 1)) = BOX DRAWINGS LIGHT VERTICAL AND LEFT
             'Á' => Glyph::LatinCapitalLetterAWithAcute, // Glyph 181 (('Á', 1)) = LATIN CAPITAL LETTER A WITH ACUTE
             'Â' => Glyph::LatinCapitalLetterAWithCircumflex, // Glyph 182 (('Â', 1)) = LATIN CAPITAL LETTER A WITH CIRCUMFLEX
             'À' => Glyph::LatinCapitalLetterAWithGrave, // Glyph 183 (('À', 1)) = LATIN CAPITAL LETTER A WITH GRAVE
-            '©' => Glyph::CopyrightSign, // Glyph 184 (('©', 1)) = COPYRIGHT SIGN
+            '©' => Glyph::CopyrightSign,                // Glyph 184 (('©', 1)) = COPYRIGHT SIGN
             '╣' => Glyph::BoxDrawingsDoubleVerticalAndLeft, // Glyph 185 (('╣', 1)) = BOX DRAWINGS DOUBLE VERTICAL AND LEFT
             '║' => Glyph::BoxDrawingsDoubleVertical, // Glyph 186 (('║', 1)) = BOX DRAWINGS DOUBLE VERTICAL
             '╗' => Glyph::BoxDrawingsDoubleDownAndLeft, // Glyph 187 (('╗', 1)) = BOX DRAWINGS DOUBLE DOWN AND LEFT
             '╝' => Glyph::BoxDrawingsDoubleUpAndLeft, // Glyph 188 (('╝', 1)) = BOX DRAWINGS DOUBLE UP AND LEFT
-            '¢' => Glyph::CentSign, // Glyph 189 (('¢', 1)) = CENT SIGN
-            '¥' => Glyph::YenSign, // Glyph 190 (('¥', 1)) = YEN SIGN
+            '¢' => Glyph::CentSign,                    // Glyph 189 (('¢', 1)) = CENT SIGN
+            '¥' => Glyph::YenSign,                     // Glyph 190 (('¥', 1)) = YEN SIGN
             '┐' => Glyph::BoxDrawingsLightDownAndLeft, // Glyph 191 (('┐', 1)) = BOX DRAWINGS LIGHT DOWN AND LEFT
             '└' => Glyph::BoxDrawingsLightUpAndRight, // Glyph 192 (('└', 1)) = BOX DRAWINGS LIGHT UP AND RIGHT
             '┴' => Glyph::BoxDrawingsLightUpAndHorizontal, // Glyph 193 (('┴', 1)) = BOX DRAWINGS LIGHT UP AND HORIZONTAL
@@ -779,9 +779,9 @@ impl Glyph {
             'Ï' => Glyph::LatinCapitalLetterIWithDiaeresis, // Glyph 216 (('Ï', 1)) = LATIN CAPITAL LETTER I WITH DIAERESIS
             '┘' => Glyph::BoxDrawingsLightUpAndLeft, // Glyph 217 (('┘', 1)) = BOX DRAWINGS LIGHT UP AND LEFT
             '┌' => Glyph::BoxDrawingsLightDownAndRight, // Glyph 218 (('┌', 1)) = BOX DRAWINGS LIGHT DOWN AND RIGHT
-            '█' => Glyph::FullBlock, // Glyph 219 (('█', 1)) = FULL BLOCK
+            '█' => Glyph::FullBlock,                    // Glyph 219 (('█', 1)) = FULL BLOCK
             '▄' => Glyph::LowerHalfBlock, // Glyph 220 (('▄', 1)) = LOWER HALF BLOCK
-            '¦' => Glyph::BrokenBar, // Glyph 221 (('¦', 1)) = BROKEN BAR
+            '¦' => Glyph::BrokenBar,       // Glyph 221 (('¦', 1)) = BROKEN BAR
             'Ì' => Glyph::LatinCapitalLetterIWithGrave, // Glyph 222 (('Ì', 1)) = LATIN CAPITAL LETTER I WITH GRAVE
             '▀' => Glyph::UpperHalfBlock, // Glyph 223 (('▀', 1)) = UPPER HALF BLOCK
             'Ó' => Glyph::LatinCapitalLetterOWithAcute, // Glyph 224 (('Ó', 1)) = LATIN CAPITAL LETTER O WITH ACUTE
@@ -790,7 +790,7 @@ impl Glyph {
             'Ò' => Glyph::LatinCapitalLetterOWithGrave, // Glyph 227 (('Ò', 1)) = LATIN CAPITAL LETTER O WITH GRAVE
             'õ' => Glyph::LatinSmallLetterOWithTilde, // Glyph 228 (('õ', 1)) = LATIN SMALL LETTER O WITH TILDE
             'Õ' => Glyph::LatinCapitalLetterOWithTilde, // Glyph 229 (('Õ', 1)) = LATIN CAPITAL LETTER O WITH TILDE
-            'µ' => Glyph::MicroSign, // Glyph 230 (('µ', 1)) = MICRO SIGN
+            'µ' => Glyph::MicroSign,                    // Glyph 230 (('µ', 1)) = MICRO SIGN
             'þ' => Glyph::LatinSmallLetterThorn, // Glyph 231 (('þ', 1)) = LATIN SMALL LETTER THORN
             'Þ' => Glyph::LatinCapitalLetterThorn, // Glyph 232 (('Þ', 1)) = LATIN CAPITAL LETTER THORN
             'Ú' => Glyph::LatinCapitalLetterUWithAcute, // Glyph 233 (('Ú', 1)) = LATIN CAPITAL LETTER U WITH ACUTE
@@ -798,33 +798,31 @@ impl Glyph {
             'Ù' => Glyph::LatinCapitalLetterUWithGrave, // Glyph 235 (('Ù', 1)) = LATIN CAPITAL LETTER U WITH GRAVE
             'ý' => Glyph::LatinSmallLetterYWithAcute, // Glyph 236 (('ý', 1)) = LATIN SMALL LETTER Y WITH ACUTE
             'Ý' => Glyph::LatinCapitalLetterYWithAcute, // Glyph 237 (('Ý', 1)) = LATIN CAPITAL LETTER Y WITH ACUTE
-            '¯' => Glyph::Macron, // Glyph 238 (('¯', 1)) = MACRON
-            '´' => Glyph::AcuteAccent, // Glyph 239 (('´', 1)) = ACUTE ACCENT
-            '\u{00ad}' => Glyph::SoftHyphen, // Glyph 240 (('\xad', 1)) = SOFT HYPHEN
-            '±' => Glyph::PlusMinusSign, // Glyph 241 (('±', 1)) = PLUS-MINUS SIGN
-            '‗' => Glyph::DoubleLowLine, // Glyph 242 (('‗', 1)) = DOUBLE LOW LINE
+            '¯' => Glyph::Macron,                       // Glyph 238 (('¯', 1)) = MACRON
+            '´' => Glyph::AcuteAccent,                  // Glyph 239 (('´', 1)) = ACUTE ACCENT
+            '\u{00ad}' => Glyph::SoftHyphen,             // Glyph 240 (('\xad', 1)) = SOFT HYPHEN
+            '±' => Glyph::PlusMinusSign,                // Glyph 241 (('±', 1)) = PLUS-MINUS SIGN
+            '‗' => Glyph::DoubleLowLine,               // Glyph 242 (('‗', 1)) = DOUBLE LOW LINE
             '¾' => Glyph::VulgarFractionThreeQuarters, // Glyph 243 (('¾', 1)) = VULGAR FRACTION THREE QUARTERS
-            '¶' => Glyph::PilcrowSign, // Glyph 244 (('¶', 1)) = PILCROW SIGN
-            '§' => Glyph::SectionSign, // Glyph 245 (('§', 1)) = SECTION SIGN
-            '÷' => Glyph::DivisionSign, // Glyph 246 (('÷', 1)) = DIVISION SIGN
-            '¸' => Glyph::Cedilla, // Glyph 247 (('¸', 1)) = CEDILLA
-            '°' => Glyph::DegreeSign, // Glyph 248 (('°', 1)) = DEGREE SIGN
-            '¨' => Glyph::Diaeresis, // Glyph 249 (('¨', 1)) = DIAERESIS
-            '·' => Glyph::MiddleDot, // Glyph 250 (('·', 1)) = MIDDLE DOT
-            '¹' => Glyph::SuperscriptOne, // Glyph 251 (('¹', 1)) = SUPERSCRIPT ONE
-            '³' => Glyph::SuperscriptThree, // Glyph 252 (('³', 1)) = SUPERSCRIPT THREE
-            '²' => Glyph::SuperscriptTwo, // Glyph 253 (('²', 1)) = SUPERSCRIPT TWO
-            '■' => Glyph::BlackSquare, // Glyph 254 (('■', 1)) = BLACK SQUARE
-            '\u{00a0}' => Glyph::NoBreakSpace, // Glyph 255 (('\xa0', 1)) = NO-BREAK SPACE
-            _ => Glyph::QuestionMark, // Map unknown chars to ?
+            '¶' => Glyph::PilcrowSign,                 // Glyph 244 (('¶', 1)) = PILCROW SIGN
+            '§' => Glyph::SectionSign,                 // Glyph 245 (('§', 1)) = SECTION SIGN
+            '÷' => Glyph::DivisionSign,                // Glyph 246 (('÷', 1)) = DIVISION SIGN
+            '¸' => Glyph::Cedilla,                     // Glyph 247 (('¸', 1)) = CEDILLA
+            '°' => Glyph::DegreeSign,                  // Glyph 248 (('°', 1)) = DEGREE SIGN
+            '¨' => Glyph::Diaeresis,                   // Glyph 249 (('¨', 1)) = DIAERESIS
+            '·' => Glyph::MiddleDot,                   // Glyph 250 (('·', 1)) = MIDDLE DOT
+            '¹' => Glyph::SuperscriptOne,              // Glyph 251 (('¹', 1)) = SUPERSCRIPT ONE
+            '³' => Glyph::SuperscriptThree,            // Glyph 252 (('³', 1)) = SUPERSCRIPT THREE
+            '²' => Glyph::SuperscriptTwo,              // Glyph 253 (('²', 1)) = SUPERSCRIPT TWO
+            '■' => Glyph::BlackSquare,                // Glyph 254 (('■', 1)) = BLACK SQUARE
+            '\u{00a0}' => Glyph::NoBreakSpace,          // Glyph 255 (('\xa0', 1)) = NO-BREAK SPACE
+            _ => Glyph::QuestionMark,                   // Map unknown chars to ?
         }
     }
 
     /// Take a CodePage 850 byte
     pub fn from_byte(byte: u8) -> Glyph {
-        unsafe {
-           ::core::mem::transmute(byte)
-        }
+        unsafe { ::core::mem::transmute(byte) }
     }
 
     pub fn pixels(self, row: usize) -> u8 {
@@ -832,4 +830,3 @@ impl Glyph {
         FONT_DATA[index]
     }
 }
-

@@ -199,7 +199,7 @@ where
         // Fill in the side border
         for row in self.text_buffer.iter_mut() {
             row.glyphs[0] = Glyph::FullBlock;
-            row.glyphs[row.glyphs.len()-1] = Glyph::FullBlock;
+            row.glyphs[row.glyphs.len() - 1] = Glyph::FullBlock;
         }
         self.clear();
     }
