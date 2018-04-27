@@ -285,20 +285,15 @@ where
         let text_row = line / FONT_HEIGHT;
         let font_row = line % FONT_HEIGHT;
         if let Some(ref mut hw) = self.hw {
+            // @TODO try storing the font data as 16 different arrays, one for each slice.
+            // You then select the array up front and avoid an addition inside the loop.
             if text_row < TEXT_NUM_ROWS {
-                for (ch, _attr) in self.text_buffer[text_row].glyphs.iter() {
+                for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
                     let w = ch.pixels(font_row);
-                    // match attr.0 {
-                    //     7 => hw.write_pixels(w, w, w),
-                    //     // 6 => hw.write_pixels(w, w, 0),
-                    //     // 5 => hw.write_pixels(w, 0, w),
-                    //     4 => hw.write_pixels(w, 0, 0),
-                    //     // 3 => hw.write_pixels(0, w, w),
-                    //     2 => hw.write_pixels(0, w, 0),
-                    //     1 => hw.write_pixels(0, 0, w),
-                    //     _ => hw.write_pixels(0, 0, 0),
-                    // }
-                    hw.write_pixels(w, w, 0xFF);
+                    let red = ((attr.0 >> 2) & 1) * 0xFF;
+                    let blue = ((attr.0 >> 1) & 1) * 0xFF;
+                    let green = ((attr.0 >> 0) & 1) * 0xFF;
+                    hw.write_pixels(w & red, w & green, w & blue);
                 }
             }
         }
