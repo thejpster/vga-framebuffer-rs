@@ -144,8 +144,21 @@ pub struct Point(pub usize, pub usize);
 
 #[derive(Copy, Clone)]
 pub struct TextRow {
-    pub glyphs: [Glyph; TEXT_NUM_COLS_INC_BORDER],
+    pub glyphs: [(Glyph, Attr); TEXT_NUM_COLS_INC_BORDER],
 }
+
+/// This structure describes the attributes for a Glyph.
+/// They're all packed into 8 bits to save RAM.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Attr(u8);
+
+pub const WHITE_ON_BLACK: Attr = Attr(7);
+pub const YELLOW_ON_BLACK: Attr = Attr(6);
+pub const MAGENTA_ON_BLACK: Attr = Attr(5);
+pub const RED_ON_BLACK: Attr = Attr(4);
+pub const CYAN_ON_BLACK: Attr = Attr(3);
+pub const GREEN_ON_BLACK: Attr = Attr(2);
+pub const BLUE_ON_BLACK: Attr = Attr(1);
 
 /// This structure represents the framebuffer - a 2D array of monochome pixels.
 ///
@@ -164,6 +177,7 @@ where
     col: usize,
     row: usize,
     hw: Option<T>,
+    attr: Attr,
 }
 
 impl<T> FrameBuffer<T>
@@ -177,11 +191,12 @@ where
             fb_line: None,
             frame: 0,
             text_buffer: [TextRow {
-                glyphs: [Glyph::Null; TEXT_NUM_COLS_INC_BORDER],
+                glyphs: [(Glyph::Null, WHITE_ON_BLACK); TEXT_NUM_COLS_INC_BORDER],
             }; TEXT_NUM_ROWS],
             hw: None,
             col: 0,
             row: 0,
+            attr: WHITE_ON_BLACK
         }
     }
 
@@ -198,8 +213,8 @@ where
         self.hw = Some(hw);
         // Fill in the side border
         for row in self.text_buffer.iter_mut() {
-            row.glyphs[0] = Glyph::FullBlock;
-            row.glyphs[row.glyphs.len() - 1] = Glyph::FullBlock;
+            row.glyphs[0] = (Glyph::FullBlock, BLUE_ON_BLACK);
+            row.glyphs[row.glyphs.len() - 1] = (Glyph::FullBlock, BLUE_ON_BLACK);
         }
         self.clear();
     }
@@ -271,9 +286,19 @@ where
         let font_row = line % FONT_HEIGHT;
         if let Some(ref mut hw) = self.hw {
             if text_row < TEXT_NUM_ROWS {
-                for ch in self.text_buffer[text_row].glyphs.iter() {
+                for (ch, _attr) in self.text_buffer[text_row].glyphs.iter() {
                     let w = ch.pixels(font_row);
-                    hw.write_pixels(w, w, w);
+                    // match attr.0 {
+                    //     7 => hw.write_pixels(w, w, w),
+                    //     // 6 => hw.write_pixels(w, w, 0),
+                    //     // 5 => hw.write_pixels(w, 0, w),
+                    //     4 => hw.write_pixels(w, 0, 0),
+                    //     // 3 => hw.write_pixels(0, w, w),
+                    //     2 => hw.write_pixels(0, w, 0),
+                    //     1 => hw.write_pixels(0, 0, w),
+                    //     _ => hw.write_pixels(0, 0, 0),
+                    // }
+                    hw.write_pixels(w, w, 0xFF);
                 }
             }
         }
@@ -283,7 +308,7 @@ where
     pub fn clear(&mut self) {
         for row in self.text_buffer.iter_mut() {
             for slot in row.glyphs.iter_mut().skip(1).take(TEXT_NUM_COLS) {
-                *slot = Glyph::Space;
+                *slot = (Glyph::Space, WHITE_ON_BLACK);
             }
         }
         self.row = 0;
@@ -292,18 +317,18 @@ where
 
     /// Puts a char on screen at the specified place. Unicode chars are mapped
     /// to Codepage 850 first.
-    pub fn write_char_at(&mut self, ch: char, col: usize, row: usize, _flip: bool) {
+    pub fn write_char_at(&mut self, ch: char, col: usize, row: usize, attr: Option<Attr>) {
         if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
             // Skip over the left border
-            self.text_buffer[row].glyphs[col + 1] = Glyph::map_char(ch);
+            self.text_buffer[row].glyphs[col + 1] = (Glyph::map_char(ch), attr.unwrap_or(self.attr));
         }
     }
 
     /// Puts a glyph on screen at the specified place
-    pub fn write_glyph_at(&mut self, glyph: Glyph, col: usize, row: usize, _flip: bool) {
+    pub fn write_glyph_at(&mut self, glyph: Glyph, col: usize, row: usize, attr: Option<Attr>) {
         if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
             // Skip over the left border
-            self.text_buffer[row].glyphs[col + 1] = glyph;
+            self.text_buffer[row].glyphs[col + 1] = (glyph, attr.unwrap_or(self.attr));
         }
     }
 
@@ -351,7 +376,7 @@ where
                 ch => {
                     let col = self.col;
                     let row = self.row;
-                    self.write_char_at(ch, col, row, false);
+                    self.write_char_at(ch, col, row, None);
                     self.col += 1;
                 }
             }
@@ -371,7 +396,7 @@ where
                     .skip(1)
                     .take(TEXT_NUM_COLS)
                 {
-                    *slot = Glyph::Space;
+                    *slot = (Glyph::Space, WHITE_ON_BLACK);
                 }
             }
         }
