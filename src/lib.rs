@@ -332,6 +332,22 @@ where
         }
     }
 
+    /// Puts a char on screen at the current position.
+    pub fn write_char(&mut self, ch: char, attr: Option<Attr>) {
+        // Skip over the left border
+        self.text_buffer[self.row].glyphs[self.col + 1] = (Glyph::map_char(ch), attr.unwrap_or(self.attr));
+        self.col += 1;
+        self.wrap_cursor();
+    }
+
+    /// Puts a glyph on screen at the current position.
+    pub fn write_glyph(&mut self, glyph: Glyph, attr: Option<Attr>) {
+        // Skip over the left border
+        self.text_buffer[self.row].glyphs[self.col + 1] = (glyph, attr.unwrap_or(self.attr));
+        self.col += 1;
+        self.wrap_cursor();
+    }
+
     /// Returns Ok(()) if dimensions are OK, or Err(()) if they are out of
     /// range.
     pub fn goto(&mut self, col: usize, row: usize) -> Result<(), ()> {
@@ -341,6 +357,28 @@ where
             Ok(())
         } else {
             Err(())
+        }
+    }
+
+    fn wrap_cursor(&mut self) {
+        if self.col == TEXT_NUM_COLS {
+            self.col = 0;
+            self.row += 1;
+        }
+        if self.row == TEXT_NUM_ROWS {
+            // Scroll screen
+            self.row = TEXT_NUM_ROWS - 1;
+            for line in 0..TEXT_NUM_ROWS - 1 {
+                self.text_buffer[line] = self.text_buffer[line + 1];
+            }
+            for slot in self.text_buffer[TEXT_MAX_ROW]
+                .glyphs
+                .iter_mut()
+                .skip(1)
+                .take(TEXT_NUM_COLS)
+            {
+                *slot = (Glyph::Space, WHITE_ON_BLACK);
+            }
         }
     }
 }
@@ -373,32 +411,9 @@ where
                     let tabs = self.col / 9;
                     self.col = (tabs + 1) * 9;
                 }
-                ch => {
-                    let col = self.col;
-                    let row = self.row;
-                    self.write_char_at(ch, col, row, None);
-                    self.col += 1;
-                }
+                ch => self.write_char(ch, None)
             }
-            if self.col == TEXT_NUM_COLS {
-                self.col = 0;
-                self.row += 1;
-            }
-            if self.row == TEXT_NUM_ROWS {
-                // Scroll screen
-                self.row = TEXT_NUM_ROWS - 1;
-                for line in 0..TEXT_NUM_ROWS - 1 {
-                    self.text_buffer[line] = self.text_buffer[line + 1];
-                }
-                for slot in self.text_buffer[TEXT_MAX_ROW]
-                    .glyphs
-                    .iter_mut()
-                    .skip(1)
-                    .take(TEXT_NUM_COLS)
-                {
-                    *slot = (Glyph::Space, WHITE_ON_BLACK);
-                }
-            }
+            self.wrap_cursor();
         }
         Ok(())
     }
