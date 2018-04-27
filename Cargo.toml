@@ -10,3 +10,6 @@ repository = "https://github.com/thejpster/vga-framebuffer-rs"
 
 [dependencies]
 bresenham = "0.1.1"
+
+[dev-dependencies]
+term = "0.5"
