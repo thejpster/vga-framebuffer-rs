@@ -82,7 +82,7 @@ pub const MAX_Y: usize = VISIBLE_LINES - 1;
 pub const VISIBLE_COLS: usize = 400;
 /// Highest X co-ord
 pub const MAX_X: usize = VISIBLE_COLS - 1;
-/// How many 16-bit words in a line
+/// How many words in a line
 pub const HORIZONTAL_WORDS: usize = (VISIBLE_COLS + BITS_PER_WORD - 1) / BITS_PER_WORD;
 
 /// How many characters in a row
@@ -196,7 +196,7 @@ where
             hw: None,
             col: 0,
             row: 0,
-            attr: WHITE_ON_BLACK
+            attr: WHITE_ON_BLACK,
         }
     }
 
@@ -213,8 +213,8 @@ where
         self.hw = Some(hw);
         // Fill in the side border
         for row in self.text_buffer.iter_mut() {
-            row.glyphs[0] = (Glyph::FullBlock, BLUE_ON_BLACK);
-            row.glyphs[row.glyphs.len() - 1] = (Glyph::FullBlock, BLUE_ON_BLACK);
+            row.glyphs[0] = (Glyph::FullBlock, WHITE_ON_BLACK);
+            row.glyphs[row.glyphs.len() - 1] = (Glyph::FullBlock, WHITE_ON_BLACK);
         }
         self.clear();
     }
@@ -229,6 +229,11 @@ where
         self.line_no += 1;
 
         match self.line_no {
+            V_DATA_FIRST...V_DATA_LAST => {
+                let line = self.line_no - V_DATA_FIRST;
+                self.calculate_pixels(line);
+                self.fb_line = Some(line);
+            }
             V_BACK_PORCH_FIRST => {
                 if let Some(ref mut hw) = self.hw {
                     hw.vsync_off();
@@ -238,11 +243,6 @@ where
             V_TOP_BORDER_FIRST...V_TOP_BORDER_LAST => {
                 self.solid_line();
                 self.fb_line = None;
-            }
-            V_DATA_FIRST...V_DATA_LAST => {
-                let line = self.line_no - V_DATA_FIRST;
-                self.calculate_pixels(line);
-                self.fb_line = Some(line);
             }
             V_BOTTOM_BORDER_FIRST...V_BOTTOM_BORDER_LAST => {
                 self.solid_line();
@@ -284,15 +284,14 @@ where
     fn calculate_pixels(&mut self, line: usize) {
         let text_row = line / FONT_HEIGHT;
         let font_row = line % FONT_HEIGHT;
+        let slice = &font::FONT_DATA[font_row];
         if let Some(ref mut hw) = self.hw {
-            // @TODO try storing the font data as 16 different arrays, one for each slice.
-            // You then select the array up front and avoid an addition inside the loop.
             if text_row < TEXT_NUM_ROWS {
-                for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
-                    let w = ch.pixels(font_row);
-                    let red = ((attr.0 >> 2) & 1) * 0xFF;
-                    let blue = ((attr.0 >> 1) & 1) * 0xFF;
-                    let green = ((attr.0 >> 0) & 1) * 0xFF;
+                for (ch, attr) in self.text_buffer[text_row].glyphs.iter().cloned() {
+                    let w = slice[ch as usize];
+                    let red = 0xFF; // ((attr.0 >> 2) & 1) * 0xFF;
+                    let green = 0xFF; // ((attr.0 >> 1) & 1) * 0xFF;
+                    let blue = 0xFF; // ((attr.0 >> 0) & 1) * 0xFF;
                     hw.write_pixels(w & red, w & green, w & blue);
                 }
             }
@@ -315,7 +314,8 @@ where
     pub fn write_char_at(&mut self, ch: char, col: usize, row: usize, attr: Option<Attr>) {
         if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
             // Skip over the left border
-            self.text_buffer[row].glyphs[col + 1] = (Glyph::map_char(ch), attr.unwrap_or(self.attr));
+            self.text_buffer[row].glyphs[col + 1] =
+                (Glyph::map_char(ch), attr.unwrap_or(self.attr));
         }
     }
 
@@ -330,7 +330,8 @@ where
     /// Puts a char on screen at the current position.
     pub fn write_char(&mut self, ch: char, attr: Option<Attr>) {
         // Skip over the left border
-        self.text_buffer[self.row].glyphs[self.col + 1] = (Glyph::map_char(ch), attr.unwrap_or(self.attr));
+        self.text_buffer[self.row].glyphs[self.col + 1] =
+            (Glyph::map_char(ch), attr.unwrap_or(self.attr));
         self.col += 1;
         self.wrap_cursor();
     }
@@ -406,7 +407,7 @@ where
                     let tabs = self.col / 9;
                     self.col = (tabs + 1) * 9;
                 }
-                ch => self.write_char(ch, None)
+                ch => self.write_char(ch, None),
             }
             self.wrap_cursor();
         }
