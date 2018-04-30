@@ -40,8 +40,6 @@
 #![no_std]
 #![feature(const_fn)]
 
-extern crate bresenham;
-
 mod font;
 
 pub use font::*;
@@ -213,8 +211,8 @@ where
         self.hw = Some(hw);
         // Fill in the side border
         for row in self.text_buffer.iter_mut() {
-            row.glyphs[0] = (Glyph::FullBlock, BLUE_ON_BLACK);
-            row.glyphs[row.glyphs.len() - 1] = (Glyph::FullBlock, BLUE_ON_BLACK);
+            row.glyphs[0] = (Glyph::FullBlock, WHITE_ON_BLACK);
+            row.glyphs[row.glyphs.len() - 1] = (Glyph::FullBlock, WHITE_ON_BLACK);
         }
         self.clear();
     }
@@ -285,15 +283,11 @@ where
         let text_row = line / FONT_HEIGHT;
         let font_row = line % FONT_HEIGHT;
         if let Some(ref mut hw) = self.hw {
-            // @TODO try storing the font data as 16 different arrays, one for each slice.
-            // You then select the array up front and avoid an addition inside the loop.
             if text_row < TEXT_NUM_ROWS {
-                for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
+                for (ch, _attr) in self.text_buffer[text_row].glyphs.iter() {
                     let w = ch.pixels(font_row);
-                    let red = ((attr.0 >> 2) & 1) * 0xFF;
-                    let blue = ((attr.0 >> 1) & 1) * 0xFF;
-                    let green = ((attr.0 >> 0) & 1) * 0xFF;
-                    hw.write_pixels(w & red, w & green, w & blue);
+                    // CPU isn't fast enough to calculate colours here
+                    hw.write_pixels(w, w, 0xFF);
                 }
             }
         }
