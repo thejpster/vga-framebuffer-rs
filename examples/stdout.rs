@@ -1,6 +1,8 @@
 extern crate term;
 extern crate vga_framebuffer;
 
+use vga_framebuffer::{Console, Col, Position, Row};
+
 struct Dummy {
     col: usize,
 }
@@ -72,17 +74,14 @@ use std::fmt::Write;
 fn main() {
     let mut d = Dummy { col: 0 };
     let mut fb = Box::new(vga_framebuffer::FrameBuffer::new());
+    let max_col = Col(vga_framebuffer::TEXT_MAX_COL as u8);
+    let max_row = Row(vga_framebuffer::TEXT_MAX_ROW as u8);
     fb.init(&mut d);
     fb.clear();
-    fb.write_char_at('$', 0, 0, false);
-    fb.write_char_at('$', 0, vga_framebuffer::TEXT_MAX_ROW, false);
-    fb.write_char_at('$', vga_framebuffer::TEXT_MAX_COL, 0, false);
-    fb.write_char_at(
-        '$',
-        vga_framebuffer::TEXT_MAX_COL,
-        vga_framebuffer::TEXT_MAX_ROW,
-        false,
-    );
+    fb.write_char_at('$', Position::origin()).unwrap();
+    fb.write_char_at('$', Position::new(max_row, Col::origin())).unwrap();
+    fb.write_char_at('$', Position::new(Row::origin(), max_col)).unwrap();
+    fb.write_char_at('$', Position::new(max_row, max_col)).unwrap();
     writeln!(fb, "\nThis is a test").unwrap();
     for _ in 0..628 {
         fb.isr_sol();

@@ -40,8 +40,11 @@
 #![no_std]
 #![feature(const_fn)]
 
+extern crate console_traits;
+
 mod font;
 
+pub use console_traits::*;
 pub use font::*;
 
 // See http://tinyvga.com/vga-timing/800x600@60Hz
@@ -172,10 +175,10 @@ where
     fb_line: Option<usize>,
     frame: usize,
     text_buffer: [TextRow; TEXT_NUM_ROWS],
-    col: usize,
-    row: usize,
     hw: Option<T>,
     attr: Attr,
+    pos: Position,
+    mode: ControlCharMode,
 }
 
 impl<T> FrameBuffer<T>
@@ -192,9 +195,12 @@ where
                 glyphs: [(Glyph::Null, WHITE_ON_BLACK); TEXT_NUM_COLS_INC_BORDER],
             }; TEXT_NUM_ROWS],
             hw: None,
-            col: 0,
-            row: 0,
-            attr: WHITE_ON_BLACK
+            pos: Position {
+                row: Row(0),
+                col: Col(0),
+            },
+            attr: WHITE_ON_BLACK,
+            mode: ControlCharMode::Interpret,
         }
     }
 
@@ -300,75 +306,101 @@ where
                 *slot = (Glyph::Space, WHITE_ON_BLACK);
             }
         }
-        self.row = 0;
-        self.col = 0;
-    }
-
-    /// Puts a char on screen at the specified place. Unicode chars are mapped
-    /// to Codepage 850 first.
-    pub fn write_char_at(&mut self, ch: char, col: usize, row: usize, attr: Option<Attr>) {
-        if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
-            // Skip over the left border
-            self.text_buffer[row].glyphs[col + 1] = (Glyph::map_char(ch), attr.unwrap_or(self.attr));
-        }
+        self.pos = Position::origin();
     }
 
     /// Puts a glyph on screen at the specified place
-    pub fn write_glyph_at(&mut self, glyph: Glyph, col: usize, row: usize, attr: Option<Attr>) {
-        if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
+    pub fn write_glyph_at(&mut self, glyph: Glyph, pos: Position, attr: Option<Attr>) {
+        if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
             // Skip over the left border
-            self.text_buffer[row].glyphs[col + 1] = (glyph, attr.unwrap_or(self.attr));
+            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize + 1] =
+                (glyph, attr.unwrap_or(self.attr));
         }
-    }
-
-    /// Puts a char on screen at the current position.
-    pub fn write_char(&mut self, ch: char, attr: Option<Attr>) {
-        // Skip over the left border
-        self.text_buffer[self.row].glyphs[self.col + 1] = (Glyph::map_char(ch), attr.unwrap_or(self.attr));
-        self.col += 1;
-        self.wrap_cursor();
     }
 
     /// Puts a glyph on screen at the current position.
     pub fn write_glyph(&mut self, glyph: Glyph, attr: Option<Attr>) {
         // Skip over the left border
-        self.text_buffer[self.row].glyphs[self.col + 1] = (glyph, attr.unwrap_or(self.attr));
-        self.col += 1;
-        self.wrap_cursor();
+        self.text_buffer[self.pos.row.0 as usize].glyphs[self.pos.col.0 as usize + 1] =
+            (glyph, attr.unwrap_or(self.attr));
+        self.move_cursor_right().unwrap();
+    }
+}
+
+impl<T> Console for FrameBuffer<T>
+where
+    T: Hardware,
+{
+    type Error = ();
+
+    /// Gets the last col on the screen.
+    fn get_width(&self) -> Col {
+        Col(TEXT_MAX_COL as u8)
     }
 
-    /// Returns Ok(()) if dimensions are OK, or Err(()) if they are out of
-    /// range.
-    pub fn goto(&mut self, col: usize, row: usize) -> Result<(), ()> {
-        if (col < TEXT_NUM_COLS) && (row < TEXT_NUM_ROWS) {
-            self.col = col;
-            self.row = row;
-            Ok(())
-        } else {
-            Err(())
-        }
+    /// Gets the last row on the screen.
+    fn get_height(&self) -> Row {
+        Row(TEXT_MAX_ROW as u8)
     }
 
-    fn wrap_cursor(&mut self) {
-        if self.col == TEXT_NUM_COLS {
-            self.col = 0;
-            self.row += 1;
+    /// Set the horizontal position for the next text output.
+    fn set_col(&mut self, col: Col) -> Result<(), Self::Error> {
+        self.pos.col = col;
+        Ok(())
+    }
+
+    /// Set the vertical position for the next text output.
+    fn set_row(&mut self, row: Row) -> Result<(), Self::Error> {
+        self.pos.row = row;
+        Ok(())
+    }
+
+    /// Set the horizontal and vertical position for the next text output.
+    fn set_pos(&mut self, pos: Position) -> Result<(), Self::Error> {
+        self.pos = pos;
+        Ok(())
+    }
+
+    /// Get the current screen position.
+    fn get_pos(&self) -> Position {
+        self.pos
+    }
+
+    /// Set the control char mode
+    fn set_control_char_mode(&mut self, mode: ControlCharMode) {
+        self.mode = mode;
+    }
+
+    /// Get the current control char mode
+    fn get_control_char_mode(&self) -> ControlCharMode {
+        self.mode
+    }
+
+    /// Called when the screen needs to scroll up one row.
+    fn scroll_screen(&mut self) -> Result<(), Self::Error> {
+        for line in 0..TEXT_NUM_ROWS - 1 {
+            self.text_buffer[line] = self.text_buffer[line + 1];
         }
-        if self.row == TEXT_NUM_ROWS {
-            // Scroll screen
-            self.row = TEXT_NUM_ROWS - 1;
-            for line in 0..TEXT_NUM_ROWS - 1 {
-                self.text_buffer[line] = self.text_buffer[line + 1];
-            }
-            for slot in self.text_buffer[TEXT_MAX_ROW]
-                .glyphs
-                .iter_mut()
-                .skip(1)
-                .take(TEXT_NUM_COLS)
-            {
-                *slot = (Glyph::Space, WHITE_ON_BLACK);
-            }
+        for slot in self.text_buffer[TEXT_MAX_ROW]
+            .glyphs
+            .iter_mut()
+            .skip(1)
+            .take(TEXT_NUM_COLS)
+        {
+            *slot = (Glyph::Space, WHITE_ON_BLACK);
         }
+        Ok(())
+    }
+
+    /// Write a single Unicode char to the screen at the given position
+    /// without updating the current position.
+    fn write_char_at(&mut self, ch: char, pos: Position) -> Result<(), Self::Error> {
+        if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
+            // Skip over the left border
+            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize + 1] =
+                (Glyph::map_char(ch), self.attr);
+        }
+        Ok(())
     }
 }
 
@@ -377,33 +409,7 @@ where
     T: Hardware,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        for ch in s.chars() {
-            match ch {
-                '\n' => {
-                    self.col = 0;
-                    self.row += 1;
-                }
-                '\u{007f}' => {
-                    if self.col == 0 {
-                        self.col = TEXT_MAX_COL;
-                        if self.row > 0 {
-                            self.row -= 1;
-                        }
-                    } else {
-                        self.col -= 1;
-                    }
-                }
-                '\r' => {
-                    self.col = 0;
-                }
-                '\t' => {
-                    let tabs = self.col / 9;
-                    self.col = (tabs + 1) * 9;
-                }
-                ch => self.write_char(ch, None)
-            }
-            self.wrap_cursor();
-        }
+        self.write_string(s).unwrap();
         Ok(())
     }
 }

@@ -8,5 +8,8 @@ keywords = ["vga", "text"]
 categories = ["embedded", "no-std"]
 repository = "https://github.com/thejpster/vga-framebuffer-rs"
 
+[dependencies]
+console-traits = "0.1"
+
 [dev-dependencies]
 term = "0.5"
