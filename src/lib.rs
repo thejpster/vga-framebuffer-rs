@@ -48,11 +48,11 @@ pub use console_traits::*;
 pub use font::*;
 
 // See http://tinyvga.com/vga-timing/800x600@60Hz
-// These values assume a 40 MHz pixel clock
-const H_VISIBLE_AREA: u32 = 800;
-const H_FRONT_PORCH: u32 = 40;
-const H_SYNC_PULSE: u32 = 128;
-const H_BACK_PORCH: u32 = 88;
+// These values have been adjusted to assume a 20 MHz pixel clock
+const H_VISIBLE_AREA: u32 = 400;
+const H_FRONT_PORCH: u32 = 20;
+const H_SYNC_PULSE: u32 = 64;
+const H_BACK_PORCH: u32 = 44;
 const H_WHOLE_LINE: u32 = H_VISIBLE_AREA + H_FRONT_PORCH + H_SYNC_PULSE + H_BACK_PORCH;
 const V_VISIBLE_AREA: usize = 600;
 const V_FRONT_PORCH: usize = 1;
@@ -72,22 +72,22 @@ const V_BOTTOM_BORDER_FIRST: usize = V_DATA_FIRST + (FONT_HEIGHT * TEXT_NUM_ROWS
 const V_BOTTOM_BORDER_LAST: usize = V_FRONT_PORCH_FIRST - 1;
 const V_FRONT_PORCH_FIRST: usize = V_BOTTOM_BORDER_FIRST + V_BOTTOM_BORDER;
 
-const PIXEL_CLOCK: u32 = 40_000_000;
+const PIXEL_CLOCK: u32 = 20_000_000;
 const BITS_PER_WORD: usize = 8;
 
 /// Number of lines in frame buffer
-pub const VISIBLE_LINES: usize = 600;
+pub const VISIBLE_LINES: usize = V_VISIBLE_AREA as usize;
 /// Highest Y co-ord
 pub const MAX_Y: usize = VISIBLE_LINES - 1;
 /// Number of columns in frame buffer
-pub const VISIBLE_COLS: usize = 400;
+pub const VISIBLE_COLS: usize = H_VISIBLE_AREA as usize;
 /// Highest X co-ord
 pub const MAX_X: usize = VISIBLE_COLS - 1;
 /// How many 16-bit words in a line
 pub const HORIZONTAL_WORDS: usize = (VISIBLE_COLS + BITS_PER_WORD - 1) / BITS_PER_WORD;
 
 /// How many characters in a row
-pub const TEXT_NUM_COLS: usize = 48;
+pub const TEXT_NUM_COLS: usize = (VISIBLE_COLS / FONT_WIDTH) - 2;
 /// Highest X co-ord for text
 pub const TEXT_MAX_COL: usize = TEXT_NUM_COLS - 1;
 /// Number of glyphs in a row, including borders
