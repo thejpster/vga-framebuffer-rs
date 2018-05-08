@@ -151,15 +151,13 @@ pub struct TextRow {
 /// This structure describes the attributes for a Glyph.
 /// They're all packed into 8 bits to save RAM.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct Attr(u8);
-
-pub const WHITE_ON_BLACK: Attr = Attr(7);
-pub const YELLOW_ON_BLACK: Attr = Attr(6);
-pub const MAGENTA_ON_BLACK: Attr = Attr(5);
-pub const RED_ON_BLACK: Attr = Attr(4);
-pub const CYAN_ON_BLACK: Attr = Attr(3);
-pub const GREEN_ON_BLACK: Attr = Attr(2);
-pub const BLUE_ON_BLACK: Attr = Attr(1);
+#[repr(u8)]
+pub enum Attr {
+    Normal = 0,
+    Reverse = 1,
+    WhiteOnBlack = 2,
+    GreenOnBlack = 3,
+}
 
 /// This structure represents the framebuffer - a 2D array of monochome pixels.
 ///
@@ -179,6 +177,7 @@ where
     attr: Attr,
     pos: Position,
     mode: ControlCharMode,
+    attr_map: [[(u8, u8, u8, u8); 256]; 4]
 }
 
 impl<T> FrameBuffer<T>
@@ -192,15 +191,16 @@ where
             fb_line: None,
             frame: 0,
             text_buffer: [TextRow {
-                glyphs: [(Glyph::Null, WHITE_ON_BLACK); TEXT_NUM_COLS_INC_BORDER],
+                glyphs: [(Glyph::Null, Attr::Normal); TEXT_NUM_COLS_INC_BORDER],
             }; TEXT_NUM_ROWS],
             hw: None,
             pos: Position {
                 row: Row(0),
                 col: Col(0),
             },
-            attr: WHITE_ON_BLACK,
+            attr: Attr::Normal,
             mode: ControlCharMode::Interpret,
+            attr_map: [[(0, 0, 0, 0); 256]; 4]
         }
     }
 
@@ -217,8 +217,24 @@ where
         self.hw = Some(hw);
         // Fill in the side border
         for row in self.text_buffer.iter_mut() {
-            row.glyphs[0] = (Glyph::FullBlock, WHITE_ON_BLACK);
-            row.glyphs[row.glyphs.len() - 1] = (Glyph::FullBlock, WHITE_ON_BLACK);
+            row.glyphs[0] = (Glyph::FullBlock, Attr::Normal);
+            row.glyphs[row.glyphs.len() - 1] = (Glyph::FullBlock, Attr::Normal);
+        }
+        // White on blue
+        for (idx, triple) in self.attr_map[0].iter_mut().enumerate() {
+            *triple = (idx as u8, idx as u8, 0xFF, 0);
+        }
+        // Blue on white
+        for (idx, triple) in self.attr_map[1].iter_mut().enumerate() {
+            *triple = ((idx as u8) ^ 0xFF, (idx as u8) ^ 0xFF, 0xFF, 0);
+        }
+        // White on black
+        for (idx, triple) in self.attr_map[2].iter_mut().enumerate() {
+            *triple = (idx as u8, idx as u8, idx as u8, 0);
+        }
+        // Green on black
+        for (idx, triple) in self.attr_map[3].iter_mut().enumerate() {
+            *triple = (0, idx as u8, 0, 0);
         }
         self.clear();
     }
@@ -290,10 +306,10 @@ where
         let font_row = line % FONT_HEIGHT;
         if let Some(ref mut hw) = self.hw {
             if text_row < TEXT_NUM_ROWS {
-                for (ch, _attr) in self.text_buffer[text_row].glyphs.iter() {
-                    let w = ch.pixels(font_row);
-                    // CPU isn't fast enough to calculate colours here
-                    hw.write_pixels(w, w, 0xFF);
+                for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
+                    let mut w = ch.pixels(font_row);
+                    let triple = self.attr_map[(*attr) as usize][w as usize];
+                    hw.write_pixels(triple.0, triple.1, triple.2);
                 }
             }
         }
@@ -303,7 +319,7 @@ where
     pub fn clear(&mut self) {
         for row in self.text_buffer.iter_mut() {
             for slot in row.glyphs.iter_mut().skip(1).take(TEXT_NUM_COLS) {
-                *slot = (Glyph::Space, WHITE_ON_BLACK);
+                *slot = (Glyph::Space, Attr::Normal);
             }
         }
         self.pos = Position::origin();
@@ -324,6 +340,11 @@ where
         self.text_buffer[self.pos.row.0 as usize].glyphs[self.pos.col.0 as usize + 1] =
             (glyph, attr.unwrap_or(self.attr));
         self.move_cursor_right().unwrap();
+    }
+
+    /// Change the current character attribute
+    pub fn set_attr(&mut self, attr: Attr) {
+        self.attr = attr;
     }
 }
 
@@ -387,7 +408,7 @@ where
             .skip(1)
             .take(TEXT_NUM_COLS)
         {
-            *slot = (Glyph::Space, WHITE_ON_BLACK);
+            *slot = (Glyph::Space, Attr::Normal);
         }
         Ok(())
     }
