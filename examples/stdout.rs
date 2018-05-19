@@ -26,7 +26,7 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
     }
 
     /// Called when pixels need to be written to the output pin.
-    fn write_pixels(&mut self, red: u8, green: u8, blue: u8) {
+    fn write_pixels(&mut self, red: u32, green: u32, blue: u32) {
         let mut t = term::stdout().unwrap();
         for bit in (0..8).rev() {
             let red_bit = red & (1 << bit) != 0;
