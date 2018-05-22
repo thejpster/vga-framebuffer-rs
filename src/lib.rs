@@ -262,6 +262,15 @@ where
         self.frame
     }
 
+    /// Returns the current visible line number or None in the blanking period.
+    pub fn line(&self) -> Option<usize> {
+        if self.line_no >= V_DATA_FIRST && self.line_no <= V_DATA_LAST {
+            Some(self.line_no - V_DATA_FIRST)
+        } else {
+            None
+        }
+    }
+
     /// Call this at the start of every line.
     pub fn isr_sol(&mut self) {
         self.line_no += 1;
@@ -360,6 +369,11 @@ where
         self.text_buffer[self.pos.row.0 as usize].glyphs[self.pos.col.0 as usize + 1] =
             (glyph, attr.unwrap_or(self.attr));
         self.move_cursor_right().unwrap();
+    }
+
+    /// Changes the attribute for a given position, leaving the glyph unchanged.
+    pub fn set_attr_at(&mut self, pos: Position, attr: Attr) {
+        self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize + 1].1 = attr;
     }
 
     /// Change the current character attribute
