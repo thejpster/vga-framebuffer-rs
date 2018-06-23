@@ -271,6 +271,18 @@ where
         }
     }
 
+    /// Returns the number of lines since startup.
+    pub fn total_line(&self) -> u64 {
+        let line_a = self.line_no;
+        let mut f = self.frame;
+        let line_b = self.line_no;
+        if line_b < line_a {
+            // We wrapped - read new frame
+            f = self.frame;
+        }
+        ((f as u64) * (V_WHOLE_FRAME as u64)) + (line_b as u64)
+    }
+
     /// Call this at the start of every line.
     pub fn isr_sol(&mut self) {
         self.line_no += 1;
