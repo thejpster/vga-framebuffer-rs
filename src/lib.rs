@@ -42,10 +42,21 @@
 
 extern crate console_traits;
 
-mod font;
+mod charset;
+mod font8x16;
+mod font8x8;
 
+pub use charset::*;
 pub use console_traits::*;
-pub use font::*;
+use font8x16::Font8x16;
+// use font8x8::Font8x8;
+
+pub trait Font {
+    fn pixels(&self, glyph: Char, row: usize) -> u8;
+    fn height_pixels(&self) -> usize;
+    fn width_pixels(&self) -> usize;
+    fn length_bytes(&self) -> usize;
+}
 
 // See http://tinyvga.com/vga-timing/800x600@60Hz
 // These values have been adjusted to assume a 20 MHz pixel clock
@@ -62,13 +73,15 @@ const V_WHOLE_FRAME: usize = V_SYNC_PULSE + V_BACK_PORCH + V_VISIBLE_AREA + V_FR
 const V_TOP_BORDER: usize = 12;
 const V_BOTTOM_BORDER: usize = 12;
 
+const MAX_FONT_HEIGHT: usize = 16;
+const MAX_FONT_WIDTH: usize = 8;
 const V_SYNC_PULSE_FIRST: usize = 0;
 const V_BACK_PORCH_FIRST: usize = V_SYNC_PULSE_FIRST + V_SYNC_PULSE;
 const V_TOP_BORDER_FIRST: usize = V_BACK_PORCH_FIRST + V_BACK_PORCH;
 const V_TOP_BORDER_LAST: usize = V_DATA_FIRST - 1;
 const V_DATA_FIRST: usize = V_TOP_BORDER_FIRST + V_TOP_BORDER;
 const V_DATA_LAST: usize = V_BOTTOM_BORDER_FIRST - 1;
-const V_BOTTOM_BORDER_FIRST: usize = V_DATA_FIRST + (FONT_HEIGHT * TEXT_NUM_ROWS);
+const V_BOTTOM_BORDER_FIRST: usize = V_DATA_FIRST + (MAX_FONT_HEIGHT * TEXT_NUM_ROWS);
 const V_BOTTOM_BORDER_LAST: usize = V_FRONT_PORCH_FIRST - 1;
 const V_FRONT_PORCH_FIRST: usize = V_BOTTOM_BORDER_FIRST + V_BOTTOM_BORDER;
 
@@ -87,11 +100,9 @@ pub const MAX_X: usize = VISIBLE_COLS - 1;
 pub const HORIZONTAL_WORDS: usize = (VISIBLE_COLS + BITS_PER_WORD - 1) / BITS_PER_WORD;
 
 /// How many characters in a row
-pub const TEXT_NUM_COLS: usize = (VISIBLE_COLS / FONT_WIDTH) - 2;
+pub const TEXT_NUM_COLS: usize = (VISIBLE_COLS / MAX_FONT_WIDTH) - 2;
 /// Highest X co-ord for text
 pub const TEXT_MAX_COL: usize = TEXT_NUM_COLS - 1;
-/// Number of glyphs in a row, including borders
-pub const TEXT_NUM_COLS_INC_BORDER: usize = TEXT_NUM_COLS + 2;
 /// How many rows of characters on the screen
 pub const TEXT_NUM_ROWS: usize = 36;
 /// Highest Y co-ord for text
@@ -145,10 +156,10 @@ pub struct Point(pub usize, pub usize);
 
 #[derive(Copy, Clone)]
 pub struct TextRow {
-    pub glyphs: [(Glyph, Attr); TEXT_NUM_COLS_INC_BORDER],
+    pub glyphs: [(Char, Attr); TEXT_NUM_COLS],
 }
 
-/// This structure describes the attributes for a Glyph.
+/// This structure describes the attributes for a Char.
 /// They're all packed into 8 bits to save RAM.
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Attr(u8);
@@ -162,7 +173,7 @@ pub enum Colour {
     Cyan = 3,
     Green = 2,
     Blue = 1,
-    Black = 0
+    Black = 0,
 }
 
 impl Attr {
@@ -192,7 +203,6 @@ impl core::default::Default for Attr {
 
 const RGB_MAPS: [[u32; 256]; 64] = include!("maps.txt");
 
-
 /// This structure represents the framebuffer - a 2D array of monochome pixels.
 ///
 /// The framebuffer is stored as an array of horizontal lines, where each line
@@ -211,7 +221,7 @@ where
     attr: Attr,
     pos: Position,
     mode: ControlCharMode,
-    escape_mode: EscapeCharMode
+    escape_mode: EscapeCharMode,
 }
 
 impl<T> FrameBuffer<T>
@@ -225,7 +235,7 @@ where
             fb_line: None,
             frame: 0,
             text_buffer: [TextRow {
-                glyphs: [(Glyph::Null, DEFAULT_ATTR); TEXT_NUM_COLS_INC_BORDER],
+                glyphs: [(Char::Null, DEFAULT_ATTR); TEXT_NUM_COLS],
             }; TEXT_NUM_ROWS],
             hw: None,
             pos: Position {
@@ -241,7 +251,7 @@ where
     /// Initialise the hardware (by calling the `configure` callback).
     pub fn init(&mut self, mut hw: T) {
         // This all assumes an 8-pixel font (i.e. 1 byte or two per u16)
-        assert_eq!(FONT_WIDTH, 8);
+        assert_eq!(MAX_FONT_WIDTH, 8);
         hw.configure(
             H_WHOLE_LINE,
             H_SYNC_PULSE,
@@ -249,11 +259,6 @@ where
             PIXEL_CLOCK,
         );
         self.hw = Some(hw);
-        // Fill in the side border
-        for row in self.text_buffer.iter_mut() {
-            row.glyphs[0] = (Glyph::FullBlock, DEFAULT_ATTR);
-            row.glyphs[row.glyphs.len() - 1] = (Glyph::FullBlock, DEFAULT_ATTR);
-        }
         self.clear();
     }
 
@@ -338,58 +343,63 @@ where
 
     /// Calculate the pixels for the given video line.
     ///
-    /// Converts each glyph into 8 pixels, then pushes them out as pairs to
-    /// the callback function (to be buffered).
+    /// Converts each glyph into 8 pixels, then pushes them out as RGB
+    /// triplets to the callback function (to be buffered).
     fn calculate_pixels(&mut self, line: usize) {
-        let text_row = line / FONT_HEIGHT;
-        let font_row = line % FONT_HEIGHT;
+        let text_row = line / MAX_FONT_HEIGHT;
+        let font_row = line % MAX_FONT_HEIGHT;
+        let font = Font8x16;
         if let Some(ref mut hw) = self.hw {
+            // Left border
+            hw.write_pixels(0xFF, 0xFF, 0xFF);
+            // Characters in the middle
             if text_row < TEXT_NUM_ROWS {
                 for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
-                    let mut w = ch.pixels(font_row);
-                    let rgb_addr = (RGB_MAPS.as_ptr() as usize) + (attr.0 as usize * 1024_usize)
+                    let mut w = font.pixels(*ch, font_row);
+                    let rgb_addr = (RGB_MAPS.as_ptr() as usize)
+                        + (attr.0 as usize * 1024_usize)
                         + (w as usize * 4_usize);
                     let rgb_word = unsafe { core::ptr::read(rgb_addr as *const u32) };
                     hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
                 }
             }
+            // Right border
+            hw.write_pixels(0xFF, 0xFF, 0xFF);
         }
     }
 
     /// Clears the screen and resets the cursor to 0,0.
     pub fn clear(&mut self) {
         for row in self.text_buffer.iter_mut() {
-            for slot in row.glyphs.iter_mut().skip(1).take(TEXT_NUM_COLS) {
-                *slot = (Glyph::Space, self.attr);
+            for slot in row.glyphs.iter_mut() {
+                *slot = (Char::Space, self.attr);
             }
         }
         self.pos = Position::origin();
     }
 
     /// Puts a glyph on screen at the specified place
-    pub fn write_glyph_at(&mut self, glyph: Glyph, pos: Position, attr: Option<Attr>) {
+    pub fn write_glyph_at(&mut self, glyph: Char, pos: Position, attr: Option<Attr>) {
         if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
-            // Skip over the left border
-            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize + 1] =
+            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
                 (glyph, attr.unwrap_or(self.attr));
         }
     }
 
     /// Puts a glyph on screen at the current position.
-    pub fn write_glyph(&mut self, glyph: Glyph, attr: Option<Attr>) {
-        // Skip over the left border
-        self.text_buffer[self.pos.row.0 as usize].glyphs[self.pos.col.0 as usize + 1] =
+    pub fn write_glyph(&mut self, glyph: Char, attr: Option<Attr>) {
+        self.text_buffer[self.pos.row.0 as usize].glyphs[self.pos.col.0 as usize ] =
             (glyph, attr.unwrap_or(self.attr));
         self.move_cursor_right().unwrap();
     }
 
     /// Changes the attribute for a given position, leaving the glyph unchanged.
     pub fn set_attr_at(&mut self, pos: Position, attr: Attr) {
-        self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize + 1].1 = attr;
+        self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize].1 = attr;
     }
 
     /// Change the current character attribute
-    pub fn set_attr(&mut self, attr: Attr) -> Attr{
+    pub fn set_attr(&mut self, attr: Attr) -> Attr {
         let old = self.attr;
         self.attr = attr;
         old
@@ -468,10 +478,8 @@ where
         for slot in self.text_buffer[TEXT_MAX_ROW]
             .glyphs
             .iter_mut()
-            .skip(1)
-            .take(TEXT_NUM_COLS)
         {
-            *slot = (Glyph::Space, DEFAULT_ATTR);
+            *slot = (Char::Space, DEFAULT_ATTR);
         }
         Ok(())
     }
@@ -481,24 +489,58 @@ where
     /// 'Z' means clear the screen.
     fn handle_escape(&mut self, escaped_char: char) -> bool {
         match escaped_char {
-            'A' => { self.attr.set_fg(Colour::White); }
-            'B' => { self.attr.set_fg(Colour::Yellow); }
-            'C' => { self.attr.set_fg(Colour::Magenta); }
-            'D' => { self.attr.set_fg(Colour::Red); }
-            'E' => { self.attr.set_fg(Colour::Cyan); }
-            'F' => { self.attr.set_fg(Colour::Green); }
-            'G' => { self.attr.set_fg(Colour::Blue); }
-            'H' => { self.attr.set_fg(Colour::Black); }
-            'a' => { self.attr.set_bg(Colour::White); }
-            'b' => { self.attr.set_bg(Colour::Yellow); }
-            'c' => { self.attr.set_bg(Colour::Magenta); }
-            'd' => { self.attr.set_bg(Colour::Red); }
-            'e' => { self.attr.set_bg(Colour::Cyan); }
-            'f' => { self.attr.set_bg(Colour::Green); }
-            'g' => { self.attr.set_bg(Colour::Blue); }
-            'h' => { self.attr.set_bg(Colour::Black); }
-            'Z' => { self.clear(); }
-            _ => {},
+            'A' => {
+                self.attr.set_fg(Colour::White);
+            }
+            'B' => {
+                self.attr.set_fg(Colour::Yellow);
+            }
+            'C' => {
+                self.attr.set_fg(Colour::Magenta);
+            }
+            'D' => {
+                self.attr.set_fg(Colour::Red);
+            }
+            'E' => {
+                self.attr.set_fg(Colour::Cyan);
+            }
+            'F' => {
+                self.attr.set_fg(Colour::Green);
+            }
+            'G' => {
+                self.attr.set_fg(Colour::Blue);
+            }
+            'H' => {
+                self.attr.set_fg(Colour::Black);
+            }
+            'a' => {
+                self.attr.set_bg(Colour::White);
+            }
+            'b' => {
+                self.attr.set_bg(Colour::Yellow);
+            }
+            'c' => {
+                self.attr.set_bg(Colour::Magenta);
+            }
+            'd' => {
+                self.attr.set_bg(Colour::Red);
+            }
+            'e' => {
+                self.attr.set_bg(Colour::Cyan);
+            }
+            'f' => {
+                self.attr.set_bg(Colour::Green);
+            }
+            'g' => {
+                self.attr.set_bg(Colour::Blue);
+            }
+            'h' => {
+                self.attr.set_bg(Colour::Black);
+            }
+            'Z' => {
+                self.clear();
+            }
+            _ => {}
         }
         // We only have single char sequences
         true
@@ -509,8 +551,8 @@ where
     fn write_char_at(&mut self, ch: char, pos: Position) -> Result<(), Self::Error> {
         if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
             // Skip over the left border
-            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize + 1] =
-                (Glyph::map_char(ch), self.attr);
+            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
+                (Char::map_char(ch), self.attr);
         }
         Ok(())
     }
