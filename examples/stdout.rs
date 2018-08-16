@@ -5,6 +5,7 @@ use vga_framebuffer::{Col, Console, Position, Row};
 
 struct Dummy {
     col: usize,
+    output: Box<dyn term::Terminal<Output=std::io::Stdout>>,
 }
 
 impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
@@ -27,39 +28,42 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
 
     /// Called when pixels need to be written to the output pin.
     fn write_pixels(&mut self, red: u32, green: u32, blue: u32) {
-        let mut t = term::stdout().unwrap();
+        let mut old_colour = None;
         for bit in (0..8).rev() {
             let red_bit = red & (1 << bit) != 0;
             let blue_bit = blue & (1 << bit) != 0;
             let green_bit = green & (1 << bit) != 0;
             let colour: u8 = ((red_bit as u8) << 2) + ((green_bit as u8) << 1) + (blue_bit as u8);
-            match colour {
-                6 => {
-                    t.fg(term::color::YELLOW).unwrap();
+            if old_colour != Some(colour) {
+                match colour {
+                    6 => {
+                        self.output.fg(term::color::YELLOW).unwrap();
+                    }
+                    5 => {
+                        self.output.fg(term::color::MAGENTA).unwrap();
+                    }
+                    4 => {
+                        self.output.fg(term::color::GREEN).unwrap();
+                    }
+                    3 => {
+                        self.output.fg(term::color::CYAN).unwrap();
+                    }
+                    2 => {
+                        self.output.fg(term::color::GREEN).unwrap();
+                    }
+                    1 => {
+                        self.output.fg(term::color::BLUE).unwrap();
+                    }
+                    0 => {
+                        self.output.fg(term::color::BLACK).unwrap();
+                    }
+                    _ => {
+                        self.output.fg(term::color::WHITE).unwrap();
+                    }
                 }
-                5 => {
-                    t.fg(term::color::MAGENTA).unwrap();
-                }
-                4 => {
-                    t.fg(term::color::GREEN).unwrap();
-                }
-                3 => {
-                    t.fg(term::color::CYAN).unwrap();
-                }
-                2 => {
-                    t.fg(term::color::GREEN).unwrap();
-                }
-                1 => {
-                    t.fg(term::color::BLUE).unwrap();
-                }
-                0 => {
-                    t.fg(term::color::BLACK).unwrap();
-                }
-                _ => {
-                    t.fg(term::color::WHITE).unwrap();
-                }
+                old_colour = Some(colour);
             }
-            write!(t, "@@").unwrap();
+            write!(self.output, "@@").unwrap();
         }
         self.col += 1;
         if self.col == vga_framebuffer::HORIZONTAL_WORDS {
@@ -72,7 +76,7 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
 use std::fmt::Write;
 
 fn main() {
-    let mut d = Dummy { col: 0 };
+    let mut d = Dummy { col: 0, output: term::stdout().unwrap() };
     let mut fb = Box::new(vga_framebuffer::FrameBuffer::new());
     let max_col = Col(vga_framebuffer::TEXT_MAX_COL as u8);
     let max_row = Row(vga_framebuffer::TEXT_MAX_ROW as u8);
