@@ -5,7 +5,7 @@ use vga_framebuffer::{Col, Console, Position, Row};
 
 struct Dummy {
     col: usize,
-    output: Box<dyn term::Terminal<Output=std::io::Stdout>>,
+    output: Box<dyn term::Terminal<Output = std::io::Stdout>>,
 }
 
 impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
@@ -76,7 +76,10 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
 use std::fmt::Write;
 
 fn main() {
-    let mut d = Dummy { col: 0, output: term::stdout().unwrap() };
+    let mut d = Dummy {
+        col: 0,
+        output: term::stdout().unwrap(),
+    };
     let mut fb = Box::new(vga_framebuffer::FrameBuffer::new());
     let max_col = Col(vga_framebuffer::TEXT_MAX_COL as u8);
     let max_row = Row(vga_framebuffer::TEXT_MAX_ROW as u8);
@@ -90,6 +93,21 @@ fn main() {
     fb.write_char_at('$', Position::new(max_row, max_col))
         .unwrap();
     writeln!(fb, "\nThis is a test").unwrap();
+    for _ in 0..628 {
+        fb.isr_sol();
+    }
+
+    let mut graphics_buffer = vec![0u8; (384 / 8) * 144];
+    graphics_buffer[0] = 0xAA;
+    graphics_buffer[47] = 0x55;
+    graphics_buffer[0 + (143 * 48)] = 0xF0;
+    graphics_buffer[47 + (143 * 48)] = 0x0F;
+
+    // Attach a graphical buffer at a scan-line. It is interpreted as
+    // being a grid 48 bytes wide and as long as given. Each line
+    // is output twice. We've attached it to scan-line 100.
+    fb.mode2(&mut graphics_buffer[..], 100);
+
     for _ in 0..628 {
         fb.isr_sol();
     }
