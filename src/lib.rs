@@ -50,6 +50,7 @@ pub use charset::*;
 pub use console_traits::*;
 use font8x16::Font8x16;
 // use font8x8::Font8x8;
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 pub trait Font {
     fn pixels(&self, glyph: Char, row: usize) -> u8;
@@ -96,7 +97,7 @@ pub const MAX_Y: usize = VISIBLE_LINES - 1;
 pub const VISIBLE_COLS: usize = H_VISIBLE_AREA as usize;
 /// Highest X co-ord
 pub const MAX_X: usize = VISIBLE_COLS - 1;
-/// How many 16-bit words in a line
+/// How many words in a line
 pub const HORIZONTAL_WORDS: usize = (VISIBLE_COLS + BITS_PER_WORD - 1) / BITS_PER_WORD;
 
 /// How many characters in a row
@@ -213,8 +214,7 @@ pub struct FrameBuffer<T>
 where
     T: Hardware,
 {
-    line_no: usize,
-    fb_line: Option<usize>,
+    line_no: AtomicUsize,
     frame: usize,
     text_buffer: [TextRow; TEXT_NUM_ROWS],
     hw: Option<T>,
@@ -231,8 +231,7 @@ where
     /// Create a new FrameBuffer
     pub const fn new() -> FrameBuffer<T> {
         FrameBuffer {
-            line_no: 0,
-            fb_line: None,
+            line_no: AtomicUsize::new(0),
             frame: 0,
             text_buffer: [TextRow {
                 glyphs: [(Char::Null, DEFAULT_ATTR); TEXT_NUM_COLS],
@@ -262,6 +261,12 @@ where
         self.clear();
     }
 
+    /// Enable mode2 - a 1-bit-per-pixel graphical buffer which is coloured
+    /// according to the colour attributes for the matching text cells.
+    /// Supply a u8 slice that is some multiple of HORIZONTAL_WORDS long.
+    /// The buffer will be line-doubled and so can be up to 288 lines long.
+    pub fn mode2(&mut self, _buffer: &mut [u8], _start_line: usize) {}
+
     /// Returns the current frame number.
     pub fn frame(&self) -> usize {
         self.frame
@@ -269,8 +274,9 @@ where
 
     /// Returns the current visible line number or None in the blanking period.
     pub fn line(&self) -> Option<usize> {
-        if self.line_no >= V_DATA_FIRST && self.line_no <= V_DATA_LAST {
-            Some(self.line_no - V_DATA_FIRST)
+        let line = self.line_no.load(Ordering::Relaxed);
+        if line >= V_DATA_FIRST && line <= V_DATA_LAST {
+            Some(line - V_DATA_FIRST)
         } else {
             None
         }
@@ -278,9 +284,9 @@ where
 
     /// Returns the number of lines since startup.
     pub fn total_line(&self) -> u64 {
-        let line_a = self.line_no;
+        let line_a = self.line_no.load(Ordering::Relaxed);
         let mut f = self.frame;
-        let line_b = self.line_no;
+        let line_b = self.line_no.load(Ordering::Relaxed);
         if line_b < line_a {
             // We wrapped - read new frame
             f = self.frame;
@@ -290,44 +296,37 @@ where
 
     /// Call this at the start of every line.
     pub fn isr_sol(&mut self) {
-        self.line_no += 1;
+        let current_line = self.line_no.fetch_add(1, Ordering::Relaxed);
 
-        match self.line_no {
+        match current_line {
             V_BACK_PORCH_FIRST => {
                 if let Some(ref mut hw) = self.hw {
                     hw.vsync_off();
                 }
-                self.fb_line = None;
             }
             V_TOP_BORDER_FIRST...V_TOP_BORDER_LAST => {
                 self.solid_line();
-                self.fb_line = None;
             }
             V_DATA_FIRST...V_DATA_LAST => {
-                let line = self.line_no - V_DATA_FIRST;
+                let line = current_line - V_DATA_FIRST;
                 self.calculate_pixels(line);
-                self.fb_line = Some(line);
             }
             V_BOTTOM_BORDER_FIRST...V_BOTTOM_BORDER_LAST => {
                 self.solid_line();
-                self.fb_line = None;
             }
             V_FRONT_PORCH_FIRST => {
                 // End of visible frame - increment counter
                 self.frame = self.frame.wrapping_add(1);
-                self.fb_line = None;
             }
             V_WHOLE_FRAME => {
                 // Wrap around
-                self.line_no = 0;
+                self.line_no.store(0, Ordering::Relaxed);
                 if let Some(ref mut hw) = self.hw {
                     hw.vsync_on();
                 }
-                self.fb_line = None;
             }
             _ => {
                 // No output on this line
-                self.fb_line = None;
             }
         }
     }
@@ -388,7 +387,7 @@ where
 
     /// Puts a glyph on screen at the current position.
     pub fn write_glyph(&mut self, glyph: Char, attr: Option<Attr>) {
-        self.text_buffer[self.pos.row.0 as usize].glyphs[self.pos.col.0 as usize ] =
+        self.text_buffer[self.pos.row.0 as usize].glyphs[self.pos.col.0 as usize] =
             (glyph, attr.unwrap_or(self.attr));
         self.move_cursor_right().unwrap();
     }
@@ -475,10 +474,7 @@ where
         for line in 0..TEXT_NUM_ROWS - 1 {
             self.text_buffer[line] = self.text_buffer[line + 1];
         }
-        for slot in self.text_buffer[TEXT_MAX_ROW]
-            .glyphs
-            .iter_mut()
-        {
+        for slot in self.text_buffer[TEXT_MAX_ROW].glyphs.iter_mut() {
             *slot = (Char::Space, DEFAULT_ATTR);
         }
         Ok(())
@@ -489,52 +485,52 @@ where
     /// 'Z' means clear the screen.
     fn handle_escape(&mut self, escaped_char: char) -> bool {
         match escaped_char {
-            'A' => {
+            'W' => {
                 self.attr.set_fg(Colour::White);
             }
-            'B' => {
+            'Y' => {
                 self.attr.set_fg(Colour::Yellow);
             }
-            'C' => {
+            'M' => {
                 self.attr.set_fg(Colour::Magenta);
             }
-            'D' => {
+            'R' => {
                 self.attr.set_fg(Colour::Red);
             }
-            'E' => {
+            'C' => {
                 self.attr.set_fg(Colour::Cyan);
             }
-            'F' => {
+            'G' => {
                 self.attr.set_fg(Colour::Green);
             }
-            'G' => {
+            'B' => {
                 self.attr.set_fg(Colour::Blue);
             }
-            'H' => {
+            'K' => {
                 self.attr.set_fg(Colour::Black);
             }
-            'a' => {
+            'w' => {
                 self.attr.set_bg(Colour::White);
             }
-            'b' => {
+            'y' => {
                 self.attr.set_bg(Colour::Yellow);
             }
-            'c' => {
+            'm' => {
                 self.attr.set_bg(Colour::Magenta);
             }
-            'd' => {
+            'r' => {
                 self.attr.set_bg(Colour::Red);
             }
-            'e' => {
+            'c' => {
                 self.attr.set_bg(Colour::Cyan);
             }
-            'f' => {
+            'g' => {
                 self.attr.set_bg(Colour::Green);
             }
-            'g' => {
+            'b' => {
                 self.attr.set_bg(Colour::Blue);
             }
-            'h' => {
+            'k' => {
                 self.attr.set_bg(Colour::Black);
             }
             'Z' => {
