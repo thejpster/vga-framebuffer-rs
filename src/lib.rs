@@ -204,13 +204,20 @@ impl core::default::Default for Attr {
 
 const RGB_MAPS: [[u32; 256]; 64] = include!("maps.txt");
 
+/// Represents Mode2 1-bpp graphics
+pub struct Mode2<'a> {
+    buffer: &'a mut [u8],
+    start: usize,
+    end: usize,
+}
+
 /// This structure represents the framebuffer - a 2D array of monochome pixels.
 ///
 /// The framebuffer is stored as an array of horizontal lines, where each line
 /// is comprised of 8 bit words. This suits our timing needs as although the
 /// SPI peripheral on an LM4F120 which can emit 16 bits at a time, 8 proves
 /// easier to work with.
-pub struct FrameBuffer<T>
+pub struct FrameBuffer<'a, T>
 where
     T: Hardware,
 {
@@ -222,14 +229,15 @@ where
     pos: Position,
     mode: ControlCharMode,
     escape_mode: EscapeCharMode,
+    mode2: Option<Mode2<'a>>,
 }
 
-impl<T> FrameBuffer<T>
+impl<'a, T> FrameBuffer<'a, T>
 where
     T: Hardware,
 {
     /// Create a new FrameBuffer
-    pub const fn new() -> FrameBuffer<T> {
+    pub const fn new() -> FrameBuffer<'a, T> {
         FrameBuffer {
             line_no: AtomicUsize::new(0),
             frame: 0,
@@ -244,6 +252,7 @@ where
             attr: DEFAULT_ATTR,
             mode: ControlCharMode::Interpret,
             escape_mode: EscapeCharMode::Waiting,
+            mode2: None,
         }
     }
 
@@ -265,7 +274,23 @@ where
     /// according to the colour attributes for the matching text cells.
     /// Supply a u8 slice that is some multiple of HORIZONTAL_WORDS long.
     /// The buffer will be line-doubled and so can be up to 288 lines long.
-    pub fn mode2(&mut self, _buffer: &mut [u8], _start_line: usize) {}
+    pub fn mode2(&mut self, buffer: &'a mut [u8], start_line: usize) {
+        let length = buffer.len();
+        let buffer_lines = length / HORIZONTAL_WORDS;
+        let mode2 = Mode2 {
+            buffer: buffer,
+            start: start_line,
+            end: start_line + buffer_lines,
+        };
+        self.mode2 = Some(mode2);
+    }
+
+    /// Releases the memory for mode2 - busy-waits until the next frame sync
+    /// so we can be sure the output routine isn't reading the memory. It
+    /// wouldn't break anything, but it's nicer this way.
+    pub fn mode2_release(&mut self) -> Option<(&'a mut [u8], usize)> {
+        unimplemented!();
+    }
 
     /// Returns the current frame number.
     pub fn frame(&self) -> usize {
@@ -351,17 +376,29 @@ where
         if let Some(ref mut hw) = self.hw {
             // Left border
             hw.write_pixels(0xFF, 0xFF, 0xFF);
-            // Characters in the middle
-            if text_row < TEXT_NUM_ROWS {
-                for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
-                    let mut w = font.pixels(*ch, font_row);
-                    let rgb_addr = (RGB_MAPS.as_ptr() as usize)
-                        + (attr.0 as usize * 1024_usize)
-                        + (w as usize * 4_usize);
-                    let rgb_word = unsafe { core::ptr::read(rgb_addr as *const u32) };
-                    hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
+
+            let mut need_text = true;
+            if let Some(mode2) = self.mode2.as_ref() {
+                if line >= mode2.start && line < mode2.end {
+                    // Pixels in the middle
+                    need_text = false;
                 }
             }
+
+            if need_text {
+                // Characters in the middle
+                if text_row < TEXT_NUM_ROWS {
+                    for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
+                        let mut w = font.pixels(*ch, font_row);
+                        let rgb_addr = (RGB_MAPS.as_ptr() as usize)
+                            + (attr.0 as usize * 1024_usize)
+                            + (w as usize * 4_usize);
+                        let rgb_word = unsafe { core::ptr::read(rgb_addr as *const u32) };
+                        hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
+                    }
+                }
+            }
+
             // Right border
             hw.write_pixels(0xFF, 0xFF, 0xFF);
         }
@@ -410,7 +447,7 @@ where
     }
 }
 
-impl<T> Console for FrameBuffer<T>
+impl<'a, T> Console for FrameBuffer<'a, T>
 where
     T: Hardware,
 {
@@ -554,7 +591,7 @@ where
     }
 }
 
-impl<T> core::fmt::Write for FrameBuffer<T>
+impl<'a, T> core::fmt::Write for FrameBuffer<'a, T>
 where
     T: Hardware,
 {

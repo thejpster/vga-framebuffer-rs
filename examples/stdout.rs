@@ -80,7 +80,8 @@ fn main() {
         col: 0,
         output: term::stdout().unwrap(),
     };
-    let mut fb = Box::new(vga_framebuffer::FrameBuffer::new());
+    let mut graphics_buffer = vec![0u8; (384 / 8) * 144];
+    let mut fb = vga_framebuffer::FrameBuffer::new();
     let max_col = Col(vga_framebuffer::TEXT_MAX_COL as u8);
     let max_row = Row(vga_framebuffer::TEXT_MAX_ROW as u8);
     fb.init(&mut d);
@@ -97,7 +98,6 @@ fn main() {
         fb.isr_sol();
     }
 
-    let mut graphics_buffer = vec![0u8; (384 / 8) * 144];
     graphics_buffer[0] = 0xAA;
     graphics_buffer[47] = 0x55;
     graphics_buffer[0 + (143 * 48)] = 0xF0;
