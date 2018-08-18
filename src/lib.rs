@@ -87,25 +87,34 @@ const V_BOTTOM_BORDER_LAST: usize = V_FRONT_PORCH_FIRST - 1;
 const V_FRONT_PORCH_FIRST: usize = V_BOTTOM_BORDER_FIRST + V_BOTTOM_BORDER;
 
 const PIXEL_CLOCK: u32 = 20_000_000;
-const BITS_PER_WORD: usize = 8;
+
+/// Top/bottom border height
+pub const TOP_BOTTOM_BORDER_HEIGHT: usize = 12;
+// How many pixels in the left and right borders
+pub const LEFT_RIGHT_BORDER_WIDTH: usize = 8;
 
 /// Number of lines in frame buffer
-pub const VISIBLE_LINES: usize = V_VISIBLE_AREA as usize;
-/// Highest Y co-ord
-pub const MAX_Y: usize = VISIBLE_LINES - 1;
+pub const USABLE_LINES: usize = 576;
+/// Number of lines in the mode2 frame buffer (which is line-doubled)
+pub const USABLE_LINES_MODE2: usize = 288;
 /// Number of columns in frame buffer
-pub const VISIBLE_COLS: usize = H_VISIBLE_AREA as usize;
+pub const USABLE_COLS: usize = 384;
+/// Highest Y co-ord
+pub const MAX_Y: usize = USABLE_LINES - 1;
 /// Highest X co-ord
-pub const MAX_X: usize = VISIBLE_COLS - 1;
-/// How many words in a line
-pub const HORIZONTAL_WORDS: usize = (VISIBLE_COLS + BITS_PER_WORD - 1) / BITS_PER_WORD;
+pub const MAX_X: usize = USABLE_COLS - 1;
+
+/// How many words in a line (including the border)
+pub const HORIZONTAL_OCTETS: usize = 50;
+/// How many words in a line (excluding the border)
+pub const USABLE_HORIZONTAL_OCTETS: usize = 48;
 
 /// How many characters in a row
-pub const TEXT_NUM_COLS: usize = (VISIBLE_COLS / MAX_FONT_WIDTH) - 2;
+pub const TEXT_NUM_COLS: usize = USABLE_COLS / MAX_FONT_WIDTH;
 /// Highest X co-ord for text
 pub const TEXT_MAX_COL: usize = TEXT_NUM_COLS - 1;
 /// How many rows of characters on the screen
-pub const TEXT_NUM_ROWS: usize = 36;
+pub const TEXT_NUM_ROWS: usize = USABLE_LINES / MAX_FONT_HEIGHT;
 /// Highest Y co-ord for text
 pub const TEXT_MAX_ROW: usize = TEXT_NUM_ROWS - 1;
 
@@ -272,15 +281,16 @@ where
 
     /// Enable mode2 - a 1-bit-per-pixel graphical buffer which is coloured
     /// according to the colour attributes for the matching text cells.
-    /// Supply a u8 slice that is some multiple of HORIZONTAL_WORDS long.
+    /// Supply a u8 slice that is some multiple of USABLE_HORIZONTAL_OCTETS long.
     /// The buffer will be line-doubled and so can be up to 288 lines long.
     pub fn mode2(&mut self, buffer: &'a mut [u8], start_line: usize) {
         let length = buffer.len();
-        let buffer_lines = length / HORIZONTAL_WORDS;
+        let buffer_lines = length / USABLE_HORIZONTAL_OCTETS;
         let mode2 = Mode2 {
             buffer: buffer,
             start: start_line,
-            end: start_line + buffer_lines,
+            // Framebuffer is line-doubled
+            end: start_line + (2 * buffer_lines),
         };
         self.mode2 = Some(mode2);
     }
@@ -357,9 +367,11 @@ where
     }
 
     /// Calculate a solid line of pixels for the border.
+    /// @todo allow the border colour/pattern to be set
     fn solid_line(&mut self) {
         if let Some(ref mut hw) = self.hw {
-            for _ in 0..HORIZONTAL_WORDS {
+            // Middle bit
+            for _ in 0..HORIZONTAL_OCTETS {
                 hw.write_pixels(0xFF, 0xFF, 0xFF);
             }
         }
@@ -379,8 +391,30 @@ where
 
             let mut need_text = true;
             if let Some(mode2) = self.mode2.as_ref() {
-                if line >= mode2.start && line < mode2.end {
+                if line >= mode2.start && line < mode2.end && text_row < TEXT_NUM_ROWS {
                     // Pixels in the middle
+
+                    // Our framebuffer is line-doubled
+                    let framebuffer_line = (line - mode2.start) >> 1;
+
+                    // Find the block of bytes for this scan-line
+                    let start = framebuffer_line * USABLE_HORIZONTAL_OCTETS;
+                    let framebuffer_bytes =
+                        &mode2.buffer[start..(start + USABLE_HORIZONTAL_OCTETS)];
+
+                    // Write out the bytes with colour from the text-buffer
+                    for ((ch, attr), bitmap) in self.text_buffer[text_row]
+                        .glyphs
+                        .iter()
+                        .zip(framebuffer_bytes.iter())
+                    {
+                        let mut w = font.pixels(*ch, font_row) ^ bitmap;
+                        let rgb_addr = (RGB_MAPS.as_ptr() as usize)
+                            + (attr.0 as usize * 1024_usize)
+                            + (w as usize * 4_usize);
+                        let rgb_word = unsafe { core::ptr::read(rgb_addr as *const u32) };
+                        hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
+                    }
                     need_text = false;
                 }
             }
