@@ -1,7 +1,9 @@
 extern crate term;
 extern crate vga_framebuffer;
 
-use vga_framebuffer::{Col, Console, Position, Row};
+use vga_framebuffer::{Attr, Col, Colour, Console, Position, Row};
+
+mod rust_logo;
 
 struct Dummy {
     col: usize,
@@ -36,25 +38,25 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
             let colour: u8 = ((red_bit as u8) << 2) + ((green_bit as u8) << 1) + (blue_bit as u8);
             if old_colour != Some(colour) {
                 match colour {
-                    6 => {
+                    0b110 => {
                         self.output.fg(term::color::YELLOW).unwrap();
                     }
-                    5 => {
+                    0b101 => {
                         self.output.fg(term::color::MAGENTA).unwrap();
                     }
-                    4 => {
-                        self.output.fg(term::color::GREEN).unwrap();
+                    0b100 => {
+                        self.output.fg(term::color::RED).unwrap();
                     }
-                    3 => {
+                    0b011 => {
                         self.output.fg(term::color::CYAN).unwrap();
                     }
-                    2 => {
+                    0b010 => {
                         self.output.fg(term::color::GREEN).unwrap();
                     }
-                    1 => {
+                    0b001 => {
                         self.output.fg(term::color::BLUE).unwrap();
                     }
-                    0 => {
+                    0b000 => {
                         self.output.fg(term::color::BLACK).unwrap();
                     }
                     _ => {
@@ -66,7 +68,7 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
             write!(self.output, "@@").unwrap();
         }
         self.col += 1;
-        if self.col == vga_framebuffer::HORIZONTAL_WORDS {
+        if self.col == vga_framebuffer::HORIZONTAL_OCTETS {
             self.col = 0;
             println!();
         }
@@ -80,7 +82,11 @@ fn main() {
         col: 0,
         output: term::stdout().unwrap(),
     };
-    let mut graphics_buffer = vec![0u8; (384 / 8) * 144];
+    let mut mode2_buffer = vec![
+        0xAAu8;
+        vga_framebuffer::USABLE_HORIZONTAL_OCTETS
+            * vga_framebuffer::USABLE_LINES_MODE2
+    ];
     let mut fb = vga_framebuffer::FrameBuffer::new();
     let max_col = Col(vga_framebuffer::TEXT_MAX_COL as u8);
     let max_row = Row(vga_framebuffer::TEXT_MAX_ROW as u8);
@@ -98,17 +104,38 @@ fn main() {
         fb.isr_sol();
     }
 
-    graphics_buffer[0] = 0xAA;
-    graphics_buffer[47] = 0x55;
-    graphics_buffer[0 + (143 * 48)] = 0xF0;
-    graphics_buffer[47 + (143 * 48)] = 0x0F;
+    let mut wheel = [Colour::Red, Colour::Green, Colour::Blue].iter().cycle();
+    for y in 0..=vga_framebuffer::TEXT_MAX_ROW {
+        for x in 0..=vga_framebuffer::TEXT_MAX_COL {
+            fb.set_attr_at(
+                Position::new(Row(y as u8), Col(x as u8)),
+                Attr::new(Colour::White, *wheel.next().unwrap()),
+            );
+        }
+        wheel.next();
+    }
+
+    for (src, dest) in rust_logo::RUST_LOGO_DATA
+        .iter()
+        .zip(mode2_buffer.iter_mut())
+    {
+        // Our source is an X-Bitmap, which puts the pixels in LSB-first order.
+        // We need MSB first order for Monotron.
+        *dest = flip_byte(*src);
+    }
 
     // Attach a graphical buffer at a scan-line. It is interpreted as
     // being a grid 48 bytes wide and as long as given. Each line
-    // is output twice. We've attached it to scan-line 100.
-    fb.mode2(&mut graphics_buffer[..], 100);
+    // is output twice. We've attached it to the first scan-line.
+    fb.mode2(&mut mode2_buffer[..], 0);
 
     for _ in 0..628 {
         fb.isr_sol();
     }
+}
+
+fn flip_byte(mut b: u8) -> u8 {
+    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+    (b & 0xAA) >> 1 | (b & 0x55) << 1
 }
