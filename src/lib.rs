@@ -295,11 +295,22 @@ where
         self.mode2 = Some(mode2);
     }
 
-    /// Releases the memory for mode2 - busy-waits until the next frame sync
-    /// so we can be sure the output routine isn't reading the memory. It
-    /// wouldn't break anything, but it's nicer this way.
+    pub fn mode2_shift(&mut self, new_start_line: usize) {
+        if let Some(mode2) = self.mode2.as_mut() {
+            mode2.start = new_start_line;
+        }
+    }
+
+    /// Releases the memory for mode2. The rendering code may keep
+    /// reading this memory buffer up until the end of the frame.
     pub fn mode2_release(&mut self) -> Option<(&'a mut [u8], usize)> {
-        unimplemented!();
+        let mut mode2_opt = None;
+        core::mem::swap(&mut self.mode2, &mut mode2_opt);
+        if let Some(mode2) = mode2_opt {
+            Some((mode2.buffer, mode2.start))
+        } else {
+            None
+        }
     }
 
     /// Returns the current frame number.
@@ -403,12 +414,12 @@ where
                         &mode2.buffer[start..(start + USABLE_HORIZONTAL_OCTETS)];
 
                     // Write out the bytes with colour from the text-buffer
-                    for ((ch, attr), bitmap) in self.text_buffer[text_row]
+                    for ((_, attr), bitmap) in self.text_buffer[text_row]
                         .glyphs
                         .iter()
                         .zip(framebuffer_bytes.iter())
                     {
-                        let mut w = font.pixels(*ch, font_row) ^ bitmap;
+                        let w = *bitmap;
                         let rgb_addr = (RGB_MAPS.as_ptr() as usize)
                             + (attr.0 as usize * 1024_usize)
                             + (w as usize * 4_usize);
@@ -423,7 +434,7 @@ where
                 // Characters in the middle
                 if text_row < TEXT_NUM_ROWS {
                     for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
-                        let mut w = font.pixels(*ch, font_row);
+                        let w = font.pixels(*ch, font_row);
                         let rgb_addr = (RGB_MAPS.as_ptr() as usize)
                             + (attr.0 as usize * 1024_usize)
                             + (w as usize * 4_usize);
