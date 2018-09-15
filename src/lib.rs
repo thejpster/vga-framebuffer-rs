@@ -557,7 +557,7 @@ where
             self.text_buffer[line] = self.text_buffer[line + 1];
         }
         for slot in self.text_buffer[TEXT_MAX_ROW].glyphs.iter_mut() {
-            *slot = (Char::Space, DEFAULT_ATTR);
+            *slot = (Char::Space, self.attr);
         }
         Ok(())
     }
