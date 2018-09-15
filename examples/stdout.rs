@@ -1,7 +1,7 @@
 extern crate term;
 extern crate vga_framebuffer;
 
-use vga_framebuffer::{Attr, Col, Colour, Console, Position, Row};
+use vga_framebuffer::{Attr, Col, Colour, AsciiConsole, Position, Row};
 
 mod rust_logo;
 
@@ -92,12 +92,12 @@ fn main() {
     let max_row = Row(vga_framebuffer::TEXT_MAX_ROW as u8);
     fb.init(&mut d);
     fb.clear();
-    fb.write_char_at('$', Position::origin()).unwrap();
-    fb.write_char_at('$', Position::new(max_row, Col::origin()))
+    fb.write_char_at(b'$', Position::origin()).unwrap();
+    fb.write_char_at(b'$', Position::new(max_row, Col::origin()))
         .unwrap();
-    fb.write_char_at('$', Position::new(Row::origin(), max_col))
+    fb.write_char_at(b'$', Position::new(Row::origin(), max_col))
         .unwrap();
-    fb.write_char_at('$', Position::new(max_row, max_col))
+    fb.write_char_at(b'$', Position::new(max_row, max_col))
         .unwrap();
     writeln!(fb, "\nThis is a test").unwrap();
     for _ in 0..628 {

@@ -9,8 +9,7 @@ categories = ["embedded", "no-std"]
 repository = "https://github.com/thejpster/vga-framebuffer-rs"
 
 [dependencies.console-traits]
-version = "0.2"
-# path = "../console-traits"
+version = "0.3"
 
 [dev-dependencies]
 term = "0.5"

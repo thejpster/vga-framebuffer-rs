@@ -492,7 +492,7 @@ where
     }
 }
 
-impl<'a, T> Console for FrameBuffer<'a, T>
+impl<'a, T> BaseConsole for FrameBuffer<'a, T>
 where
     T: Hardware,
 {
@@ -561,61 +561,66 @@ where
         }
         Ok(())
     }
+}
 
+impl<'a, T> AsciiConsole for FrameBuffer<'a, T>
+where
+    T: Hardware,
+{
     /// Handle an escape char.
     /// We take a, b, c, d, e, f, g, h as being a background colour and A..H as being a foreground colour.
     /// 'Z' means clear the screen.
-    fn handle_escape(&mut self, escaped_char: char) -> bool {
+    fn handle_escape(&mut self, escaped_char: u8) -> bool {
         match escaped_char {
-            'W' => {
+            b'W' => {
                 self.attr.set_fg(Colour::White);
             }
-            'Y' => {
+            b'Y' => {
                 self.attr.set_fg(Colour::Yellow);
             }
-            'M' => {
+            b'M' => {
                 self.attr.set_fg(Colour::Magenta);
             }
-            'R' => {
+            b'R' => {
                 self.attr.set_fg(Colour::Red);
             }
-            'C' => {
+            b'C' => {
                 self.attr.set_fg(Colour::Cyan);
             }
-            'G' => {
+            b'G' => {
                 self.attr.set_fg(Colour::Green);
             }
-            'B' => {
+            b'B' => {
                 self.attr.set_fg(Colour::Blue);
             }
-            'K' => {
+            b'K' => {
                 self.attr.set_fg(Colour::Black);
             }
-            'w' => {
+            b'w' => {
                 self.attr.set_bg(Colour::White);
             }
-            'y' => {
+            b'y' => {
                 self.attr.set_bg(Colour::Yellow);
             }
-            'm' => {
+            b'm' => {
                 self.attr.set_bg(Colour::Magenta);
             }
-            'r' => {
+            b'r' => {
                 self.attr.set_bg(Colour::Red);
             }
-            'c' => {
+            b'c' => {
                 self.attr.set_bg(Colour::Cyan);
             }
-            'g' => {
+            b'g' => {
                 self.attr.set_bg(Colour::Green);
             }
-            'b' => {
+            b'b' => {
                 self.attr.set_bg(Colour::Blue);
             }
-            'k' => {
+            b'k' => {
                 self.attr.set_bg(Colour::Black);
             }
-            'Z' => {
+            b'Z' => {
                 self.clear();
             }
             _ => {}
@@ -626,11 +631,11 @@ where
 
     /// Write a single Unicode char to the screen at the given position
     /// without updating the current position.
-    fn write_char_at(&mut self, ch: char, pos: Position) -> Result<(), Self::Error> {
+    fn write_char_at(&mut self, ch: u8, pos: Position) -> Result<(), Self::Error> {
         if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
             // Skip over the left border
             self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
-                (Char::map_char(ch), self.attr);
+                (Char::from_byte(ch), self.attr);
         }
         Ok(())
     }
@@ -641,7 +646,9 @@ where
     T: Hardware,
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write_string(s).unwrap();
+        for ch in s.chars() {
+            self.write_character(Char::map_char(ch) as u8).map_err(|_| core::fmt::Error)?;
+        }
         Ok(())
     }
 }

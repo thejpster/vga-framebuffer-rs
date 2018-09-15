@@ -564,6 +564,11 @@ impl Char {
     pub fn from_byte(byte: u8) -> Char {
         unsafe { ::core::mem::transmute(byte) }
     }
+
+    /// Take a CodePage 850 byte
+    pub fn to_byte(self) -> u8 {
+        unsafe { ::core::mem::transmute(self) }
+    }
 }
 
 // End of file
