@@ -38,19 +38,24 @@
 //! See https://github.com/thejpster/monotron for an example.
 
 #![no_std]
-#![feature(const_fn)]
+#![cfg_attr(feature = "const_fn", feature(const_fn))]
 
 extern crate console_traits;
+#[macro_use]
+extern crate const_ft;
 
 mod charset;
-mod font8x16;
-mod font8x8;
+pub mod font8x32;
+pub mod font8x16;
+pub mod font8x8;
 
 pub use charset::*;
 pub use console_traits::*;
-use font8x16::Font8x16;
-// use font8x8::Font8x8;
 use core::sync::atomic::{AtomicUsize, Ordering};
+
+pub use font8x8::Font8x8;
+pub use font8x16::Font8x16;
+pub use font8x32::Font8x32;
 
 pub trait Font {
     fn pixels(&self, glyph: Char, row: usize) -> u8;
@@ -164,8 +169,18 @@ pub trait Hardware {
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Point(pub usize, pub usize);
 
+/// You can set this on a row to make the text double-height. This was common
+/// on the BBC Micro in Mode 7/Teletext mode.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum DoubleHeightMode {
+    Normal,
+    Top,
+    Bottom
+}
+
 #[derive(Copy, Clone)]
 pub struct TextRow {
+    pub double_height: DoubleHeightMode,
     pub glyphs: [(Char, Attr); TEXT_NUM_COLS],
 }
 
@@ -187,17 +202,22 @@ pub enum Colour {
 }
 
 impl Attr {
-    pub const fn new(fg: Colour, bg: Colour) -> Attr {
-        Attr(((fg as u8) * 8) + (bg as u8))
+    const FG_BITS: u8 = 0b00111000;
+    const BG_BITS: u8 = 0b00000111;
+
+    const_ft! {
+        pub fn new(fg: Colour, bg: Colour) -> Attr {
+            Attr(((fg as u8) << 3) + (bg as u8))
+        }
     }
 
     pub fn set_fg(&mut self, fg: Colour) -> &mut Attr {
-        self.0 = ((fg as u8) * 8) + (self.0 & 0x7);
+        self.0 = ((fg as u8) << 3) + (self.0 & !Self::FG_BITS);
         self
     }
 
     pub fn set_bg(&mut self, bg: Colour) -> &mut Attr {
-        self.0 = (self.0 & 0x38) + (bg as u8);
+        self.0 = (self.0 & !Self::BG_BITS) + (bg as u8);
         self
     }
 }
@@ -239,6 +259,7 @@ where
     mode: ControlCharMode,
     escape_mode: EscapeCharMode,
     mode2: Option<Mode2<'a>>,
+    font: &'static Font
 }
 
 impl<'a, T> FrameBuffer<'a, T>
@@ -246,22 +267,26 @@ where
     T: Hardware,
 {
     /// Create a new FrameBuffer
-    pub const fn new() -> FrameBuffer<'a, T> {
-        FrameBuffer {
-            line_no: AtomicUsize::new(0),
-            frame: 0,
-            text_buffer: [TextRow {
-                glyphs: [(Char::Null, DEFAULT_ATTR); TEXT_NUM_COLS],
-            }; TEXT_NUM_ROWS],
-            hw: None,
-            pos: Position {
-                row: Row(0),
-                col: Col(0),
-            },
-            attr: DEFAULT_ATTR,
-            mode: ControlCharMode::Interpret,
-            escape_mode: EscapeCharMode::Waiting,
-            mode2: None,
+    const_ft! {
+        pub fn new() -> FrameBuffer<'a, T> {
+            FrameBuffer {
+                line_no: AtomicUsize::new(0),
+                frame: 0,
+                text_buffer: [TextRow {
+                    double_height: DoubleHeightMode::Normal,
+                    glyphs: [(Char::Null, DEFAULT_ATTR); TEXT_NUM_COLS],
+                }; TEXT_NUM_ROWS],
+                hw: None,
+                pos: Position {
+                    row: Row(0),
+                    col: Col(0),
+                },
+                attr: DEFAULT_ATTR,
+                mode: ControlCharMode::Interpret,
+                escape_mode: EscapeCharMode::Waiting,
+                mode2: None,
+                font: &font8x16::Font8x16
+            }
         }
     }
 
@@ -393,9 +418,8 @@ where
     /// Converts each glyph into 8 pixels, then pushes them out as RGB
     /// triplets to the callback function (to be buffered).
     fn calculate_pixels(&mut self, line: usize) {
-        let text_row = line / MAX_FONT_HEIGHT;
-        let font_row = line % MAX_FONT_HEIGHT;
-        let font = Font8x16;
+        let text_row = line / self.font.height_pixels();
+        let mut font_row = line % self.font.height_pixels();
         if let Some(ref mut hw) = self.hw {
             // Left border
             hw.write_pixels(0xFF, 0xFF, 0xFF);
@@ -433,8 +457,18 @@ where
             if need_text {
                 // Characters in the middle
                 if text_row < TEXT_NUM_ROWS {
-                    for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
-                        let w = font.pixels(*ch, font_row);
+                    let row = &self.text_buffer[text_row];
+                    match row.double_height {
+                        DoubleHeightMode::Normal => {},
+                        DoubleHeightMode::Top => {
+                            font_row = font_row / 2;
+                        },
+                        DoubleHeightMode::Bottom => {
+                            font_row = (font_row + self.font.height_pixels()) / 2;
+                        },
+                    };
+                    for (ch, attr) in row.glyphs.iter() {
+                        let w = self.font.pixels(*ch, font_row);
                         let rgb_addr = (RGB_MAPS.as_ptr() as usize)
                             + (attr.0 as usize * 1024_usize)
                             + (w as usize * 4_usize);
@@ -447,6 +481,22 @@ where
             // Right border
             hw.write_pixels(0xFF, 0xFF, 0xFF);
         }
+    }
+
+    /// Change the current font
+    pub fn set_custom_font(&mut self, new_font: Option<&'static dyn Font>) -> Result<(), ()> {
+        let f = match new_font {
+            // The given font
+            Some(x) => x,
+            // The default font
+            None => &font8x16::Font8x16,
+        };
+        if f.width_pixels() != MAX_FONT_WIDTH {
+            // Can't handle this
+            return Err(());
+        }
+        self.font = f;
+        Ok(())
     }
 
     /// Clears the screen and resets the cursor to 0,0.
@@ -477,6 +527,16 @@ where
     /// Changes the attribute for a given position, leaving the glyph unchanged.
     pub fn set_attr_at(&mut self, pos: Position, attr: Attr) {
         self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize].1 = attr;
+    }
+
+    /// Change font height for a given line.
+    pub fn set_line_mode_at(&mut self, row: Row, double_height: DoubleHeightMode) {
+        self.text_buffer[row.0 as usize].double_height = double_height;
+    }
+
+    /// Change font height for the current line.
+    pub fn set_line_mode(&mut self, double_height: DoubleHeightMode) {
+        self.text_buffer[self.pos.row.0 as usize].double_height = double_height;
     }
 
     /// Change the current character attribute
@@ -619,6 +679,15 @@ where
             }
             b'k' => {
                 self.attr.set_bg(Colour::Black);
+            }
+            b'^' => {
+                self.set_line_mode(DoubleHeightMode::Top);
+            }
+            b'v' => {
+                self.set_line_mode(DoubleHeightMode::Bottom);
+            }
+            b'-' => {
+                self.set_line_mode(DoubleHeightMode::Normal);
             }
             b'Z' => {
                 self.clear();
