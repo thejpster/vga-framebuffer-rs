@@ -49,7 +49,7 @@ impl super::Font for Font8x8 {
 /// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 /// OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 /// SUCH DAMAGE.
-pub const FONT_DATA: [u8; 256 * 8] = [
+const FONT_DATA: [u8; 256 * 8] = [
     // Char::Null
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     // Char::SOH

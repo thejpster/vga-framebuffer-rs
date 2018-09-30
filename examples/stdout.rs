@@ -132,6 +132,39 @@ fn main() {
     for _ in 0..628 {
         fb.isr_sol();
     }
+
+    let _ = fb.mode2_release();
+
+    fb.clear();
+
+    fb.set_custom_font(Some(&vga_framebuffer::Font8x8)).unwrap();
+
+    writeln!(fb, "This is small text").unwrap();
+
+    for _ in 0..628 {
+        fb.isr_sol();
+    }
+
+    fb.set_custom_font(Some(&vga_framebuffer::Font8x32)).unwrap();
+
+    fb.clear();
+    writeln!(fb, "This is big text").unwrap();
+
+    for _ in 0..628 {
+        fb.isr_sol();
+    }
+
+    fb.set_custom_font(None).unwrap();
+
+    fb.clear();
+    // You have to put double-height text in twice, once for the top line and once for the bottom line.
+    writeln!(fb, "\u{001b}^\u{001b}k\u{001b}RThis is double height text").unwrap();
+    writeln!(fb, "\u{001b}v\u{001b}k\u{001b}GThis is double height text").unwrap();
+    writeln!(fb, "\u{001b}-\u{001b}k\u{001b}WThis is normal height text").unwrap();
+
+    for _ in 0..628 {
+        fb.isr_sol();
+    }
 }
 
 fn flip_byte(mut b: u8) -> u8 {
@@ -139,3 +172,4 @@ fn flip_byte(mut b: u8) -> u8 {
     b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
     (b & 0xAA) >> 1 | (b & 0x55) << 1
 }
+

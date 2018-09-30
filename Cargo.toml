@@ -1,12 +1,18 @@
 [package]
 name = "vga-framebuffer"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Jonathan 'theJPster' Pallant <github@thejpster.org.uk>"]
 license = "MIT OR Apache-2.0"
 description = "A text console output over a VGA compatible signal"
 keywords = ["vga", "text"]
 categories = ["embedded", "no-std"]
 repository = "https://github.com/thejpster/vga-framebuffer-rs"
+
+[features]
+const = ["const-ft/const_fn"]
+
+[dependencies.const-ft]
+version =  "0.1"
 
 [dependencies.console-traits]
 version = "0.3"
