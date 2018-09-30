@@ -9,7 +9,7 @@ categories = ["embedded", "no-std"]
 repository = "https://github.com/thejpster/vga-framebuffer-rs"
 
 [features]
-const = ["const-ft/const_fn"]
+const_fn = ["const-ft/const_fn"]
 
 [dependencies.const-ft]
 version =  "0.1"

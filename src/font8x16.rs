@@ -1,25 +1,3 @@
-use charset::Char;
-
-pub const FONT_HEIGHT: usize = 16;
-
-pub struct Font8x16;
-
-impl super::Font for Font8x16 {
-    fn pixels(&self, glyph: Char, row: usize) -> u8 {
-        let index = ((glyph as usize) * FONT_HEIGHT) + row;
-        FONT_DATA[index]
-    }
-    fn height_pixels(&self) -> usize {
-        16
-    }
-    fn width_pixels(&self) -> usize {
-        8
-    }
-    fn length_bytes(&self) -> usize {
-        16
-    }
-}
-
 /// The font data here must be in the same order as the `Char` enum. This is
 /// the cp850-8x16 font from FreeBSD. See
 /// http://web.mit.edu/freebsd/head/share/syscons/fonts/cp850-8x16.fnt
@@ -49,7 +27,7 @@ impl super::Font for Font8x16 {
 /// LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 /// OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 /// SUCH DAMAGE.
-const FONT_DATA: [u8; 256 * 16] = [
+pub(crate) const FONT_DATA: [u8; 256 * super::MAX_FONT_HEIGHT] = [
     // Char::Null
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     // Char::SOH

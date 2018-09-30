@@ -35,6 +35,10 @@
 //! Requires pixels to be emitted with a 20 MHz pixel clock (against a nominal
 //! 40 MHz pixel clock, in order to acheive the horizontal doubling).
 //!
+//! In order to maintain performance, only one font size is supported: 8x16
+//! pixels. But you can substitute your own font if required (e.g. for
+//! Teletext support).
+//!
 //! See https://github.com/thejpster/monotron for an example.
 
 #![no_std]
@@ -45,24 +49,11 @@ extern crate console_traits;
 extern crate const_ft;
 
 mod charset;
-pub mod font8x32;
 pub mod font8x16;
-pub mod font8x8;
 
 pub use charset::*;
 pub use console_traits::*;
 use core::sync::atomic::{AtomicUsize, Ordering};
-
-pub use font8x8::Font8x8;
-pub use font8x16::Font8x16;
-pub use font8x32::Font8x32;
-
-pub trait Font {
-    fn pixels(&self, glyph: Char, row: usize) -> u8;
-    fn height_pixels(&self) -> usize;
-    fn width_pixels(&self) -> usize;
-    fn length_bytes(&self) -> usize;
-}
 
 // See http://tinyvga.com/vga-timing/800x600@60Hz
 // These values have been adjusted to assume a 20 MHz pixel clock
@@ -259,7 +250,7 @@ where
     mode: ControlCharMode,
     escape_mode: EscapeCharMode,
     mode2: Option<Mode2<'a>>,
-    font: &'static Font
+    font: Option<*const u8>
 }
 
 impl<'a, T> FrameBuffer<'a, T>
@@ -285,7 +276,7 @@ where
                 mode: ControlCharMode::Interpret,
                 escape_mode: EscapeCharMode::Waiting,
                 mode2: None,
-                font: &font8x16::Font8x16
+                font: None
             }
         }
     }
@@ -418,8 +409,9 @@ where
     /// Converts each glyph into 8 pixels, then pushes them out as RGB
     /// triplets to the callback function (to be buffered).
     fn calculate_pixels(&mut self, line: usize) {
-        let text_row = line / self.font.height_pixels();
-        let mut font_row = line % self.font.height_pixels();
+        let text_row = line / MAX_FONT_HEIGHT;
+        let mut font_row = line % MAX_FONT_HEIGHT;
+        let font_table = self.font.unwrap_or(font8x16::FONT_DATA.as_ptr());
         if let Some(ref mut hw) = self.hw {
             // Left border
             hw.write_pixels(0xFF, 0xFF, 0xFF);
@@ -444,6 +436,14 @@ where
                         .zip(framebuffer_bytes.iter())
                     {
                         let w = *bitmap;
+                        // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
+                        // Each row is 4 bytes. The row index is
+                        // 0bFFFBBBPPPPPPPP, where F = foreground, B =
+                        // background, P = 8-bit pixels. We have to multiply
+                        // by 4 (the length of each row) to get the address,
+                        // and the attributes pack foreground and background
+                        // together, we just take `attr * 256 * 4`, plus the
+                        // `pixel value * 4`.
                         let rgb_addr = (RGB_MAPS.as_ptr() as usize)
                             + (attr.0 as usize * 1024_usize)
                             + (w as usize * 4_usize);
@@ -464,11 +464,20 @@ where
                             font_row = font_row / 2;
                         },
                         DoubleHeightMode::Bottom => {
-                            font_row = (font_row + self.font.height_pixels()) / 2;
+                            font_row = (font_row + MAX_FONT_HEIGHT) / 2;
                         },
                     };
-                    for (ch, attr) in row.glyphs.iter() {
-                        let w = self.font.pixels(*ch, font_row);
+                    for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
+                        let index = ((*ch as usize) * MAX_FONT_HEIGHT) + font_row;
+                        let w = unsafe { *font_table.offset(index as isize) };
+                        // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
+                        // Each row is 4 bytes. The row index is
+                        // 0bFFFBBBPPPPPPPP, where F = foreground, B =
+                        // background, P = 8-bit pixels. We have to multiply
+                        // by 4 (the length of each row) to get the address,
+                        // and the attributes pack foreground and background
+                        // together, we just take `attr * 256 * 4`, plus the
+                        // `pixel value * 4`.
                         let rgb_addr = (RGB_MAPS.as_ptr() as usize)
                             + (attr.0 as usize * 1024_usize)
                             + (w as usize * 4_usize);
@@ -484,19 +493,16 @@ where
     }
 
     /// Change the current font
-    pub fn set_custom_font(&mut self, new_font: Option<&'static dyn Font>) -> Result<(), ()> {
-        let f = match new_font {
+    pub fn set_custom_font(&mut self, new_font: Option<&'static [u8]>) {
+        self.font = match new_font {
             // The given font
-            Some(x) => x,
+            Some(x) => {
+                assert_eq!(x.len(), 256 * MAX_FONT_HEIGHT);
+                Some(x.as_ptr())
+            }
             // The default font
-            None => &font8x16::Font8x16,
+            None => None,
         };
-        if f.width_pixels() != MAX_FONT_WIDTH {
-            // Can't handle this
-            return Err(());
-        }
-        self.font = f;
-        Ok(())
     }
 
     /// Clears the screen and resets the cursor to 0,0.
@@ -505,6 +511,7 @@ where
             for slot in row.glyphs.iter_mut() {
                 *slot = (Char::Space, self.attr);
             }
+            row.double_height = DoubleHeightMode::Normal;
         }
         self.pos = Position::origin();
     }
