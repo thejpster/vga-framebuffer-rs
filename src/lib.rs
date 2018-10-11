@@ -49,7 +49,8 @@ extern crate console_traits;
 extern crate const_ft;
 
 mod charset;
-pub mod font8x16;
+pub mod freebsd_cp850;
+pub mod freebsd_teletext;
 
 pub use charset::*;
 pub use console_traits::*;
@@ -411,7 +412,7 @@ where
     fn calculate_pixels(&mut self, line: usize) {
         let text_row = line / MAX_FONT_HEIGHT;
         let mut font_row = line % MAX_FONT_HEIGHT;
-        let font_table = self.font.unwrap_or(font8x16::FONT_DATA.as_ptr());
+        let font_table = self.font.unwrap_or(freebsd_cp850::FONT_DATA.as_ptr());
         if let Some(ref mut hw) = self.hw {
             // Left border
             hw.write_pixels(0xFF, 0xFF, 0xFF);
