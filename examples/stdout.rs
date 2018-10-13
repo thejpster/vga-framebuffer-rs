@@ -137,24 +137,15 @@ fn main() {
 
     fb.clear();
 
-    fb.set_custom_font(Some(&vga_framebuffer::Font8x8)).unwrap();
+    fb.set_custom_font(Some(&vga_framebuffer::freebsd_teletext::FONT_DATA));
 
-    writeln!(fb, "This is small text").unwrap();
-
-    for _ in 0..628 {
-        fb.isr_sol();
-    }
-
-    fb.set_custom_font(Some(&vga_framebuffer::Font8x32)).unwrap();
-
-    fb.clear();
-    writeln!(fb, "This is big text").unwrap();
+    writeln!(fb, "This is teletext").unwrap();
 
     for _ in 0..628 {
         fb.isr_sol();
     }
 
-    fb.set_custom_font(None).unwrap();
+    fb.set_custom_font(None);
 
     fb.clear();
     // You have to put double-height text in twice, once for the top line and once for the bottom line.
