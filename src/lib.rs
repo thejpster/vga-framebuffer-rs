@@ -223,7 +223,7 @@ impl core::default::Default for Attr {
     }
 }
 
-const RGB_MAPS: [[u32; 256]; 64] = include!("maps.txt");
+static RGB_MAPS: [u32; 256 * 64] = include!("maps.txt");
 
 /// Represents Mode2 1-bpp graphics
 pub struct Mode2<'a> {
@@ -238,6 +238,7 @@ pub struct Mode2<'a> {
 /// is comprised of 8 bit words. This suits our timing needs as although the
 /// SPI peripheral on an LM4F120 which can emit 16 bits at a time, 8 proves
 /// easier to work with.
+#[repr(C)]
 pub struct FrameBuffer<'a, T>
 where
     T: Hardware,
@@ -440,15 +441,9 @@ where
                         // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
                         // Each row is 4 bytes. The row index is
                         // 0bFFFBBBPPPPPPPP, where F = foreground, B =
-                        // background, P = 8-bit pixels. We have to multiply
-                        // by 4 (the length of each row) to get the address,
-                        // and the attributes pack foreground and background
-                        // together, we just take `attr * 256 * 4`, plus the
-                        // `pixel value * 4`.
-                        let rgb_addr = (RGB_MAPS.as_ptr() as usize)
-                            + (attr.0 as usize * 1024_usize)
-                            + (w as usize * 4_usize);
-                        let rgb_word = unsafe { core::ptr::read(rgb_addr as *const u32) };
+                        // background, P = 8-bit pixels.
+                        let rgb_addr = unsafe { RGB_MAPS.as_ptr().offset(((attr.0 as isize) * 256_isize) + (w as isize)) };
+                        let rgb_word = unsafe { *rgb_addr };
                         hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
                     }
                     need_text = false;
@@ -468,21 +463,16 @@ where
                             font_row = (font_row + MAX_FONT_HEIGHT) / 2;
                         },
                     };
-                    for (ch, attr) in self.text_buffer[text_row].glyphs.iter() {
-                        let index = ((*ch as usize) * MAX_FONT_HEIGHT) + font_row;
-                        let w = unsafe { *font_table.offset(index as isize) };
+                    let font_table = unsafe { font_table.offset(font_row as isize) };
+                    for (ch, attr) in row.glyphs.iter() {
+                        let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
+                        let w = unsafe { *font_table.offset(index) };
                         // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
                         // Each row is 4 bytes. The row index is
                         // 0bFFFBBBPPPPPPPP, where F = foreground, B =
-                        // background, P = 8-bit pixels. We have to multiply
-                        // by 4 (the length of each row) to get the address,
-                        // and the attributes pack foreground and background
-                        // together, we just take `attr * 256 * 4`, plus the
-                        // `pixel value * 4`.
-                        let rgb_addr = (RGB_MAPS.as_ptr() as usize)
-                            + (attr.0 as usize * 1024_usize)
-                            + (w as usize * 4_usize);
-                        let rgb_word = unsafe { core::ptr::read(rgb_addr as *const u32) };
+                        // background, P = 8-bit pixels.
+                        let rgb_addr = unsafe { RGB_MAPS.as_ptr().offset(((attr.0 as isize) * 256_isize) + (w as isize)) };
+                        let rgb_word = unsafe { *rgb_addr };
                         hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
                     }
                 }
