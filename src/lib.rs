@@ -684,12 +684,15 @@ where
 
     /// Called when the screen needs to scroll up one row.
     fn scroll_screen(&mut self) -> Result<(), Self::Error> {
+        let old_cursor = self.cursor_visible;
+        self.set_cursor_visible(false);
         for line in 0..TEXT_NUM_ROWS - 1 {
             self.text_buffer[line] = self.text_buffer[line + 1];
         }
         for slot in self.text_buffer[TEXT_MAX_ROW].glyphs.iter_mut() {
             *slot = (Char::Space, self.attr);
         }
+        self.set_cursor_visible(old_cursor);
         Ok(())
     }
 }
