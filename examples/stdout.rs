@@ -140,6 +140,9 @@ fn main() {
     fb.set_custom_font(Some(&vga_framebuffer::freebsd_teletext::FONT_DATA));
 
     writeln!(fb, "This is teletext").unwrap();
+    for ch in 0x80..=0xFF {
+        fb.write_char(ch, None);
+    }
 
     for _ in 0..628 {
         fb.isr_sol();
