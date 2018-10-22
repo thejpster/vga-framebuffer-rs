@@ -39,6 +39,12 @@
 //! pixels. But you can substitute your own font if required (e.g. for
 //! Teletext support).
 //!
+//! There is optional cursor support. Rather than try and check each text cell
+//! at render time to see if it is in the cursor position, we swap chars in
+//! and out of the text buffer as the cursor moves. It's a little more
+//! expensive, but the cost is at text write time, not at render time (and so
+//! it won't break sync).
+//!
 //! See https://github.com/thejpster/monotron for an example.
 
 #![no_std]
@@ -167,7 +173,7 @@ pub struct Point(pub usize, pub usize);
 pub enum DoubleHeightMode {
     Normal,
     Top,
-    Bottom
+    Bottom,
 }
 
 #[derive(Copy, Clone)]
@@ -217,6 +223,8 @@ impl Attr {
 // White on Blue
 const DEFAULT_ATTR: Attr = Attr((7 * 8) + 1);
 
+const CURSOR: Char = Char::LowLine;
+
 impl core::default::Default for Attr {
     fn default() -> Self {
         DEFAULT_ATTR
@@ -252,7 +260,9 @@ where
     mode: ControlCharMode,
     escape_mode: EscapeCharMode,
     mode2: Option<Mode2<'a>>,
-    font: Option<*const u8>
+    font: Option<*const u8>,
+    cursor_visible: bool,
+    under_cursor: Char,
 }
 
 impl<'a, T> FrameBuffer<'a, T>
@@ -278,7 +288,9 @@ where
                 mode: ControlCharMode::Interpret,
                 escape_mode: EscapeCharMode::Waiting,
                 mode2: None,
-                font: None
+                font: None,
+                cursor_visible: true,
+                under_cursor: Char::Space
             }
         }
     }
@@ -295,6 +307,19 @@ where
         );
         self.hw = Some(hw);
         self.clear();
+    }
+
+    pub fn set_cursor_visible(&mut self, visible: bool) {
+        if visible != self.cursor_visible {
+            if visible {
+                self.cursor_visible = true;
+                self.under_cursor = self.current_cell().0;
+                self.current_cell().0 = CURSOR;
+            } else {
+                self.cursor_visible = false;
+                self.current_cell().0 = self.under_cursor;
+            }
+        }
     }
 
     /// Enable mode2 - a 1-bit-per-pixel graphical buffer which is coloured
@@ -442,7 +467,11 @@ where
                         // Each row is 4 bytes. The row index is
                         // 0bFFFBBBPPPPPPPP, where F = foreground, B =
                         // background, P = 8-bit pixels.
-                        let rgb_addr = unsafe { RGB_MAPS.as_ptr().offset(((attr.0 as isize) * 256_isize) + (w as isize)) };
+                        let rgb_addr = unsafe {
+                            RGB_MAPS
+                                .as_ptr()
+                                .offset(((attr.0 as isize) * 256_isize) + (w as isize))
+                        };
                         let rgb_word = unsafe { *rgb_addr };
                         hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
                     }
@@ -455,13 +484,13 @@ where
                 if text_row < TEXT_NUM_ROWS {
                     let row = &self.text_buffer[text_row];
                     match row.double_height {
-                        DoubleHeightMode::Normal => {},
+                        DoubleHeightMode::Normal => {}
                         DoubleHeightMode::Top => {
                             font_row = font_row / 2;
-                        },
+                        }
                         DoubleHeightMode::Bottom => {
                             font_row = (font_row + MAX_FONT_HEIGHT) / 2;
-                        },
+                        }
                     };
                     let font_table = unsafe { font_table.offset(font_row as isize) };
                     for (ch, attr) in row.glyphs.iter() {
@@ -471,7 +500,11 @@ where
                         // Each row is 4 bytes. The row index is
                         // 0bFFFBBBPPPPPPPP, where F = foreground, B =
                         // background, P = 8-bit pixels.
-                        let rgb_addr = unsafe { RGB_MAPS.as_ptr().offset(((attr.0 as isize) * 256_isize) + (w as isize)) };
+                        let rgb_addr = unsafe {
+                            RGB_MAPS
+                                .as_ptr()
+                                .offset(((attr.0 as isize) * 256_isize) + (w as isize))
+                        };
                         let rgb_word = unsafe { *rgb_addr };
                         hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
                     }
@@ -509,17 +542,32 @@ where
 
     /// Puts a glyph on screen at the specified place
     pub fn write_glyph_at(&mut self, glyph: Char, pos: Position, attr: Option<Attr>) {
-        if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
-            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
-                (glyph, attr.unwrap_or(self.attr));
+        if self.cursor_visible && (pos.row == self.pos.row) && (pos.col == self.pos.col) {
+            self.under_cursor = glyph;
+            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize].1 =
+                attr.unwrap_or(self.attr);
+        } else {
+            if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
+                self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
+                    (glyph, attr.unwrap_or(self.attr));
+            }
         }
     }
 
     /// Puts a glyph on screen at the current position.
     pub fn write_glyph(&mut self, glyph: Char, attr: Option<Attr>) {
-        self.text_buffer[self.pos.row.0 as usize].glyphs[self.pos.col.0 as usize] =
-            (glyph, attr.unwrap_or(self.attr));
+        if self.cursor_visible {
+            self.under_cursor = glyph;
+            self.current_cell().1 = attr.unwrap_or(self.attr);
+        } else {
+            *self.current_cell() = (glyph, attr.unwrap_or(self.attr));
+        }
         self.move_cursor_right().unwrap();
+    }
+
+    /// Write a single Unicode char to the screen at the current position.
+    pub fn write_char(&mut self, ch: u8, attr: Option<Attr>) {
+        self.write_glyph(Char::from_byte(ch), attr);
     }
 
     /// Changes the attribute for a given position, leaving the glyph unchanged.
@@ -548,6 +596,10 @@ where
     pub fn get_attr(&mut self) -> Attr {
         self.attr
     }
+
+    fn current_cell(&mut self) -> &mut (Char, Attr) {
+        &mut self.text_buffer[self.pos.row.0 as usize].glyphs[self.pos.col.0 as usize]
+    }
 }
 
 impl<'a, T> BaseConsole for FrameBuffer<'a, T>
@@ -568,19 +620,40 @@ where
 
     /// Set the horizontal position for the next text output.
     fn set_col(&mut self, col: Col) -> Result<(), Self::Error> {
-        self.pos.col = col;
+        if self.cursor_visible {
+            self.current_cell().0 = self.under_cursor;
+            self.pos.col = col;
+            self.under_cursor = self.current_cell().0;
+            self.current_cell().0 = CURSOR;
+        } else {
+            self.pos.col = col;
+        }
         Ok(())
     }
 
     /// Set the vertical position for the next text output.
     fn set_row(&mut self, row: Row) -> Result<(), Self::Error> {
-        self.pos.row = row;
+        if self.cursor_visible {
+            self.current_cell().0 = self.under_cursor;
+            self.pos.row = row;
+            self.under_cursor = self.current_cell().0;
+            self.current_cell().0 = CURSOR;
+        } else {
+            self.pos.row = row;
+        }
         Ok(())
     }
 
     /// Set the horizontal and vertical position for the next text output.
     fn set_pos(&mut self, pos: Position) -> Result<(), Self::Error> {
-        self.pos = pos;
+        if self.cursor_visible {
+            self.current_cell().0 = self.under_cursor;
+            self.pos = pos;
+            self.under_cursor = self.current_cell().0;
+            self.current_cell().0 = CURSOR;
+        } else {
+            self.pos = pos;
+        }
         Ok(())
     }
 
@@ -611,12 +684,15 @@ where
 
     /// Called when the screen needs to scroll up one row.
     fn scroll_screen(&mut self) -> Result<(), Self::Error> {
+        let old_cursor = self.cursor_visible;
+        self.set_cursor_visible(false);
         for line in 0..TEXT_NUM_ROWS - 1 {
             self.text_buffer[line] = self.text_buffer[line + 1];
         }
         for slot in self.text_buffer[TEXT_MAX_ROW].glyphs.iter_mut() {
             *slot = (Char::Space, self.attr);
         }
+        self.set_cursor_visible(old_cursor);
         Ok(())
     }
 }
@@ -699,10 +775,14 @@ where
     /// Write a single Unicode char to the screen at the given position
     /// without updating the current position.
     fn write_char_at(&mut self, ch: u8, pos: Position) -> Result<(), Self::Error> {
-        if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
-            // Skip over the left border
-            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
-                (Char::from_byte(ch), self.attr);
+        if self.cursor_visible && (pos.row == self.pos.row) && (pos.col == self.pos.col) {
+            self.under_cursor = Char::from_byte(ch);
+            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize].1 = self.attr;
+        } else {
+            if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
+                self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
+                    (Char::from_byte(ch), self.attr);
+            }
         }
         Ok(())
     }
@@ -714,7 +794,8 @@ where
 {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         for ch in s.chars() {
-            self.write_character(Char::map_char(ch) as u8).map_err(|_| core::fmt::Error)?;
+            self.write_character(Char::map_char(ch) as u8)
+                .map_err(|_| core::fmt::Error)?;
         }
         Ok(())
     }

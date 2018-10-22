@@ -1,7 +1,7 @@
 extern crate term;
 extern crate vga_framebuffer;
 
-use vga_framebuffer::{Attr, Col, Colour, AsciiConsole, Position, Row};
+use vga_framebuffer::{AsciiConsole, Attr, Col, Colour, Position, Row};
 
 mod rust_logo;
 
@@ -140,6 +140,9 @@ fn main() {
     fb.set_custom_font(Some(&vga_framebuffer::freebsd_teletext::FONT_DATA));
 
     writeln!(fb, "This is teletext").unwrap();
+    for ch in 0x80..=0xFF {
+        fb.write_char(ch, None);
+    }
 
     for _ in 0..628 {
         fb.isr_sol();
@@ -163,4 +166,3 @@ fn flip_byte(mut b: u8) -> u8 {
     b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
     (b & 0xAA) >> 1 | (b & 0x55) << 1
 }
-
