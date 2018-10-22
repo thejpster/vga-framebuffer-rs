@@ -1,7 +1,7 @@
 extern crate term;
 extern crate vga_framebuffer;
 
-use vga_framebuffer::{Attr, Col, Colour, AsciiConsole, Position, Row};
+use vga_framebuffer::{AsciiConsole, Attr, Col, Colour, Position, Row};
 
 mod rust_logo;
 
@@ -166,4 +166,3 @@ fn flip_byte(mut b: u8) -> u8 {
     b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
     (b & 0xAA) >> 1 | (b & 0x55) << 1
 }
-
