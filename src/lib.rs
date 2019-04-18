@@ -250,7 +250,7 @@ pub struct Mode2<'a> {
 enum IterMode<'a> {
     Blank,
     Border,
-    Main(&'a TextRow, *const u8)
+    Main(&'a TextRow, *const u8),
 }
 
 pub struct FbIterU8<'a> {
@@ -280,10 +280,7 @@ impl<'a> FbIterU8<'a> {
             let font_table = unsafe { font_table.offset(font_row as isize) };
             IterMode::Main(&text_rows[text_row_idx], font_table)
         };
-        FbIterU8 {
-            col: 0,
-            iter_mode,
-        }
+        FbIterU8 { col: 0, iter_mode }
     }
 }
 
@@ -295,20 +292,16 @@ impl<'a> Iterator for FbIterU8<'a> {
         self.col += 1;
         match self.iter_mode {
             IterMode::Border => {
-                if col < HORIZONTAL_OCTETS  {
+                if col < HORIZONTAL_OCTETS {
                     Some((0xFF, 0xFF, 0xFF))
                 } else {
                     None
                 }
             }
-            IterMode::Blank => {
-                None
-            }
+            IterMode::Blank => None,
             IterMode::Main(tr, font) => {
                 match col {
-                    BORDER_INDEX_LEFT | BORDER_INDEX_RIGHT => {
-                        Some((0xFF, 0xFF, 0xFF))
-                    },
+                    BORDER_INDEX_LEFT | BORDER_INDEX_RIGHT => Some((0xFF, 0xFF, 0xFF)),
                     e if (e - 1) < TEXT_NUM_COLS => {
                         let (ch, attr) = tr.glyphs[e - 1];
                         let index = (ch as isize) * (MAX_FONT_HEIGHT as isize);
@@ -325,7 +318,7 @@ impl<'a> Iterator for FbIterU8<'a> {
                         let rgb_word = unsafe { *rgb_addr };
                         Some((rgb_word[1], rgb_word[2], rgb_word[3]))
                     }
-                    _ => None
+                    _ => None,
                 }
             }
         }
@@ -512,7 +505,8 @@ where
                 // End of visible frame - increment counter
                 self.frame.fetch_add(1, Ordering::Relaxed);
                 // Mark rest of frame as invisible
-                self.visible_line_no.store(INVALID_VISIBLE_LINE, Ordering::Relaxed);
+                self.visible_line_no
+                    .store(INVALID_VISIBLE_LINE, Ordering::Relaxed);
             }
             V_WHOLE_FRAME => {
                 // Wrap around

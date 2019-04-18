@@ -101,13 +101,18 @@ fn main() {
     render_page(&fb);
 }
 
-fn render_page<T>(fb: &vga_framebuffer::FrameBuffer<T>) where T: vga_framebuffer::Hardware {
+fn render_page<T>(fb: &vga_framebuffer::FrameBuffer<T>)
+where
+    T: vga_framebuffer::Hardware,
+{
     for _r in 0..628 {
         render_line(fb);
     }
 }
 
-fn render_line<T>(fb: &vga_framebuffer::FrameBuffer<T>) where T: vga_framebuffer::Hardware
+fn render_line<T>(fb: &vga_framebuffer::FrameBuffer<T>)
+where
+    T: vga_framebuffer::Hardware,
 {
     let mut old_colour = None;
     let mut t = term::stdout().unwrap();
