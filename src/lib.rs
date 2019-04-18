@@ -89,7 +89,14 @@ const V_BOTTOM_BORDER_FIRST: usize = V_DATA_FIRST + (MAX_FONT_HEIGHT * TEXT_NUM_
 const V_BOTTOM_BORDER_LAST: usize = V_FRONT_PORCH_FIRST - 1;
 const V_FRONT_PORCH_FIRST: usize = V_BOTTOM_BORDER_FIRST + V_BOTTOM_BORDER;
 
+const VISIBLE_V_TOP_BORDER_FIRST: usize = 0;
+const VISIBLE_V_TOP_BORDER_LAST: usize = V_TOP_BORDER;
+const VISIBLE_V_BOTTOM_BORDER_FIRST: usize = V_TOP_BORDER + (MAX_FONT_HEIGHT * TEXT_NUM_ROWS);
+const VISIBLE_V_BOTTOM_BORDER_LAST: usize = V_VISIBLE_AREA - 1;
+
 const PIXEL_CLOCK: u32 = 20_000_000;
+
+const INVALID_VISIBLE_LINE: usize = core::usize::MAX;
 
 /// Top/bottom border height
 pub const TOP_BOTTOM_BORDER_HEIGHT: usize = 12;
@@ -120,6 +127,9 @@ pub const TEXT_MAX_COL: usize = TEXT_NUM_COLS - 1;
 pub const TEXT_NUM_ROWS: usize = USABLE_LINES / MAX_FONT_HEIGHT;
 /// Highest Y co-ord for text
 pub const TEXT_MAX_ROW: usize = TEXT_NUM_ROWS - 1;
+
+const BORDER_INDEX_LEFT: usize = 0;
+const BORDER_INDEX_RIGHT: usize = TEXT_NUM_COLS + 1;
 
 /// Implement this on your microcontroller's timer object.
 pub trait Hardware {
@@ -153,13 +163,10 @@ pub trait Hardware {
     fn configure(&mut self, width: u32, sync_end: u32, line_start: u32, clock_rate: u32);
 
     /// Called when V-Sync needs to be high.
-    fn vsync_on(&mut self);
+    fn vsync_on(&self);
 
     /// Called when V-Sync needs to be low.
-    fn vsync_off(&mut self);
-
-    /// Called word by word as pixels are calculated
-    fn write_pixels(&mut self, red: u32, green: u32, blue: u32);
+    fn vsync_off(&self);
 }
 
 /// A point on the screen.
@@ -231,13 +238,98 @@ impl core::default::Default for Attr {
     }
 }
 
-static RGB_MAPS: [u32; 256 * 64] = include!("maps.txt");
+static RGB_MAPS: [[u8; 4]; 256 * 64] = include!("maps.txt");
 
 /// Represents Mode2 1-bpp graphics
 pub struct Mode2<'a> {
     buffer: &'a mut [u8],
     start: usize,
     end: usize,
+}
+
+enum IterMode<'a> {
+    Blank,
+    Border,
+    Main(&'a TextRow, *const u8)
+}
+
+pub struct FbIterU8<'a> {
+    col: usize,
+    iter_mode: IterMode<'a>,
+}
+
+impl<'a> FbIterU8<'a> {
+    fn new(line: usize, text_rows: &'a [TextRow], font: Option<*const u8>) -> FbIterU8<'a> {
+        let iter_mode = if line == INVALID_VISIBLE_LINE {
+            IterMode::Blank
+        } else if (line <= VISIBLE_V_TOP_BORDER_LAST) || (line >= VISIBLE_V_BOTTOM_BORDER_FIRST) {
+            IterMode::Border
+        } else {
+            let text_row_idx = (line - TOP_BOTTOM_BORDER_HEIGHT) / MAX_FONT_HEIGHT;
+            let mut font_row = (line - TOP_BOTTOM_BORDER_HEIGHT) % MAX_FONT_HEIGHT;
+            match text_rows[text_row_idx].double_height {
+                DoubleHeightMode::Normal => {}
+                DoubleHeightMode::Top => {
+                    font_row = font_row / 2;
+                }
+                DoubleHeightMode::Bottom => {
+                    font_row = (font_row + MAX_FONT_HEIGHT) / 2;
+                }
+            };
+            let font_table = font.unwrap_or(freebsd_cp850::FONT_DATA.as_ptr());
+            let font_table = unsafe { font_table.offset(font_row as isize) };
+            IterMode::Main(&text_rows[text_row_idx], font_table)
+        };
+        FbIterU8 {
+            col: 0,
+            iter_mode,
+        }
+    }
+}
+
+impl<'a> Iterator for FbIterU8<'a> {
+    type Item = (u8, u8, u8);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let col = self.col;
+        self.col += 1;
+        match self.iter_mode {
+            IterMode::Border => {
+                if col < HORIZONTAL_OCTETS  {
+                    Some((0xFF, 0xFF, 0xFF))
+                } else {
+                    None
+                }
+            }
+            IterMode::Blank => {
+                None
+            }
+            IterMode::Main(tr, font) => {
+                match col {
+                    BORDER_INDEX_LEFT | BORDER_INDEX_RIGHT => {
+                        Some((0xFF, 0xFF, 0xFF))
+                    },
+                    e if (e - 1) < TEXT_NUM_COLS => {
+                        let (ch, attr) = tr.glyphs[e - 1];
+                        let index = (ch as isize) * (MAX_FONT_HEIGHT as isize);
+                        let w = unsafe { *font.offset(index) };
+                        // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
+                        // Each row is 4 bytes. The row index is
+                        // 0bFFFBBBPPPPPPPP, where F = foreground, B =
+                        // background, P = 8-bit pixels.
+                        let rgb_addr = unsafe {
+                            RGB_MAPS
+                                .as_ptr()
+                                .offset(((attr.0 as isize) * 256_isize) + (w as isize))
+                        };
+                        let rgb_word = unsafe { *rgb_addr };
+                        Some((rgb_word[1], rgb_word[2], rgb_word[3]))
+                    }
+                    _ => None
+                }
+            }
+        }
+    }
 }
 
 /// This structure represents the framebuffer - a 2D array of monochome pixels.
@@ -252,7 +344,8 @@ where
     T: Hardware,
 {
     line_no: AtomicUsize,
-    frame: usize,
+    visible_line_no: AtomicUsize,
+    frame: AtomicUsize,
     text_buffer: [TextRow; TEXT_NUM_ROWS],
     hw: Option<T>,
     attr: Attr,
@@ -274,7 +367,8 @@ where
         pub fn new() -> FrameBuffer<'a, T> {
             FrameBuffer {
                 line_no: AtomicUsize::new(0),
-                frame: 0,
+                visible_line_no: AtomicUsize::new(INVALID_VISIBLE_LINE),
+                frame: AtomicUsize::new(0),
                 text_buffer: [TextRow {
                     double_height: DoubleHeightMode::Normal,
                     glyphs: [(Char::Null, DEFAULT_ATTR); TEXT_NUM_COLS],
@@ -374,14 +468,14 @@ where
 
     /// Returns the current frame number.
     pub fn frame(&self) -> usize {
-        self.frame
+        self.frame.load(Ordering::Relaxed)
     }
 
     /// Returns the current visible line number or None in the blanking period.
     pub fn line(&self) -> Option<usize> {
-        let line = self.line_no.load(Ordering::Relaxed);
-        if line >= V_DATA_FIRST && line <= V_DATA_LAST {
-            Some(line - V_DATA_FIRST)
+        let line = self.visible_line_no.load(Ordering::Relaxed);
+        if line != INVALID_VISIBLE_LINE {
+            Some(line)
         } else {
             None
         }
@@ -390,43 +484,40 @@ where
     /// Returns the number of lines since startup.
     pub fn total_line(&self) -> u64 {
         let line_a = self.line_no.load(Ordering::Relaxed);
-        let mut f = self.frame;
+        let mut f = self.frame.load(Ordering::Relaxed);
         let line_b = self.line_no.load(Ordering::Relaxed);
         if line_b < line_a {
             // We wrapped - read new frame
-            f = self.frame;
+            f = self.frame.load(Ordering::Relaxed);
         }
         ((f as u64) * (V_WHOLE_FRAME as u64)) + (line_b as u64)
     }
 
     /// Call this at the start of every line.
-    pub fn isr_sol(&mut self) {
+    pub fn isr_sol(&self) {
         let current_line = self.line_no.fetch_add(1, Ordering::Relaxed);
 
         match current_line {
             V_BACK_PORCH_FIRST => {
-                if let Some(ref mut hw) = self.hw {
+                if let Some(ref hw) = self.hw {
                     hw.vsync_off();
                 }
             }
-            V_TOP_BORDER_FIRST...V_TOP_BORDER_LAST => {
-                self.solid_line();
-            }
-            V_DATA_FIRST...V_DATA_LAST => {
-                let line = current_line - V_DATA_FIRST;
-                self.calculate_pixels(line);
-            }
-            V_BOTTOM_BORDER_FIRST...V_BOTTOM_BORDER_LAST => {
-                self.solid_line();
+            V_TOP_BORDER_FIRST...V_BOTTOM_BORDER_LAST => {
+                // The visible area. The first add will roll the value
+                // over from INVALID_VISIBLE_LINE (-1) to 0.
+                self.visible_line_no.fetch_add(1, Ordering::Relaxed);
             }
             V_FRONT_PORCH_FIRST => {
                 // End of visible frame - increment counter
-                self.frame = self.frame.wrapping_add(1);
+                self.frame.fetch_add(1, Ordering::Relaxed);
+                // Mark rest of frame as invisible
+                self.visible_line_no.store(INVALID_VISIBLE_LINE, Ordering::Relaxed);
             }
             V_WHOLE_FRAME => {
                 // Wrap around
                 self.line_no.store(0, Ordering::Relaxed);
-                if let Some(ref mut hw) = self.hw {
+                if let Some(ref hw) = self.hw {
                     hw.vsync_on();
                 }
             }
@@ -436,101 +527,95 @@ where
         }
     }
 
-    /// Calculate a solid line of pixels for the border.
-    /// @todo allow the border colour/pattern to be set
-    fn solid_line(&mut self) {
-        if let Some(ref mut hw) = self.hw {
-            // Middle bit
-            for _ in 0..HORIZONTAL_OCTETS {
-                hw.write_pixels(0xFF, 0xFF, 0xFF);
-            }
-        }
+    pub fn iter_u8(&self) -> FbIterU8 {
+        let visible_line = self.visible_line_no.load(Ordering::Relaxed);
+        FbIterU8::new(visible_line, &self.text_buffer, self.font)
     }
 
-    /// Calculate the pixels for the given video line.
-    ///
-    /// Converts each glyph into 8 pixels, then pushes them out as RGB
-    /// triplets to the callback function (to be buffered).
-    fn calculate_pixels(&mut self, line: usize) {
-        let text_row = line / MAX_FONT_HEIGHT;
-        let mut font_row = line % MAX_FONT_HEIGHT;
-        let font_table = self.font.unwrap_or(freebsd_cp850::FONT_DATA.as_ptr());
-        if let Some(ref mut hw) = self.hw {
-            // Left border
-            hw.write_pixels(0xFF, 0xFF, 0xFF);
+    // /// Calculate the pixels for the given video line.
+    // ///
+    // /// Converts each glyph into 8 pixels, then pushes them out as RGB
+    // /// triplets to the callback function (to be buffered).
+    // fn calculate_pixels(&mut self, line: usize) {
+    //     let text_row = line / MAX_FONT_HEIGHT;
+    //     let mut font_row = line % MAX_FONT_HEIGHT;
+    //     let font_table = self.font.unwrap_or(freebsd_cp850::FONT_DATA.as_ptr());
+    //     if let Some(ref mut hw) = self.hw {
+    //         // Left border
+    //         hw.write_pixels(0xFF, 0xFF, 0xFF);
 
-            let mut need_text = true;
-            if let Some(mode2) = self.mode2.as_ref() {
-                if line >= mode2.start && line < mode2.end && text_row < TEXT_NUM_ROWS {
-                    // Pixels in the middle
+    //         let mut need_text = true;
+    //         if let Some(mode2) = self.mode2.as_ref() {
+    //             if line >= mode2.start && line < mode2.end && text_row < TEXT_NUM_ROWS {
+    //                 // Pixels in the middle
 
-                    // Our framebuffer is line-doubled
-                    let framebuffer_line = (line - mode2.start) >> 1;
+    //                 // Our framebuffer is line-doubled
+    //                 let framebuffer_line = (line - mode2.start) >> 1;
 
-                    // Find the block of bytes for this scan-line
-                    let start = framebuffer_line * USABLE_HORIZONTAL_OCTETS;
-                    let framebuffer_bytes =
-                        &mode2.buffer[start..(start + USABLE_HORIZONTAL_OCTETS)];
+    //                 // Find the block of bytes for this scan-line
+    //                 let start = framebuffer_line * USABLE_HORIZONTAL_OCTETS;
+    //                 let framebuffer_bytes =
+    //                     &mode2.buffer[start..(start + USABLE_HORIZONTAL_OCTETS)];
 
-                    // Write out the bytes with colour from the text-buffer
-                    for ((_, attr), bitmap) in self.text_buffer[text_row]
-                        .glyphs
-                        .iter()
-                        .zip(framebuffer_bytes.iter())
-                    {
-                        let w = *bitmap;
-                        // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
-                        // Each row is 4 bytes. The row index is
-                        // 0bFFFBBBPPPPPPPP, where F = foreground, B =
-                        // background, P = 8-bit pixels.
-                        let rgb_addr = unsafe {
-                            RGB_MAPS
-                                .as_ptr()
-                                .offset(((attr.0 as isize) * 256_isize) + (w as isize))
-                        };
-                        let rgb_word = unsafe { *rgb_addr };
-                        hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
-                    }
-                    need_text = false;
-                }
-            }
+    //                 // Write out the bytes with colour from the text-buffer
+    //                 for ((_, attr), bitmap) in self.text_buffer[text_row]
+    //                     .glyphs
+    //                     .iter()
+    //                     .zip(framebuffer_bytes.iter())
+    //                 {
+    //                     let w = *bitmap;
+    //                     // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
+    //                     // Each row is 4 bytes. The row index is
+    //                     // 0bFFFBBBPPPPPPPP, where F = foreground, B =
+    //                     // background, P = 8-bit pixels.
+    //                     let rgb_addr = unsafe {
+    //                         RGB_MAPS
+    //                             .as_ptr()
+    //                             .offset(((attr.0 as isize) * 256_isize) + (w as isize))
+    //                     };
+    //                     let rgb_word = unsafe { *rgb_addr };
+    //                     hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
+    //                 }
+    //                 need_text = false;
+    //             }
+    //         }
 
-            if need_text {
-                // Characters in the middle
-                if text_row < TEXT_NUM_ROWS {
-                    let row = &self.text_buffer[text_row];
-                    match row.double_height {
-                        DoubleHeightMode::Normal => {}
-                        DoubleHeightMode::Top => {
-                            font_row = font_row / 2;
-                        }
-                        DoubleHeightMode::Bottom => {
-                            font_row = (font_row + MAX_FONT_HEIGHT) / 2;
-                        }
-                    };
-                    let font_table = unsafe { font_table.offset(font_row as isize) };
-                    for (ch, attr) in row.glyphs.iter() {
-                        let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
-                        let w = unsafe { *font_table.offset(index) };
-                        // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
-                        // Each row is 4 bytes. The row index is
-                        // 0bFFFBBBPPPPPPPP, where F = foreground, B =
-                        // background, P = 8-bit pixels.
-                        let rgb_addr = unsafe {
-                            RGB_MAPS
-                                .as_ptr()
-                                .offset(((attr.0 as isize) * 256_isize) + (w as isize))
-                        };
-                        let rgb_word = unsafe { *rgb_addr };
-                        hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
-                    }
-                }
-            }
+    //         if need_text {
+    //             // Characters in the middle
+    //             if text_row < TEXT_NUM_ROWS {
+    //                 let row = &self.text_buffer[text_row];
+    //                 match row.double_height {
+    //                     DoubleHeightMode::Normal => {}
+    //                     DoubleHeightMode::Top => {
+    //                         font_row = font_row / 2;
+    //                     }
+    //                     DoubleHeightMode::Bottom => {
+    //                         font_row = (font_row + MAX_FONT_HEIGHT) / 2;
+    //                     }
+    //                 };
+    //                 let font_table = unsafe { font_table.offset(font_row as isize) };
+    //                 for (ch, attr) in row.glyphs.iter() {
+    //                     let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
+    //                     let w = unsafe { *font_table.offset(index) };
+    //                     // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
+    //                     // Each row is 4 bytes. The row index is
+    //                     // 0bFFFBBBPPPPPPPP, where F = foreground, B =
+    //                     // background, P = 8-bit pixels.
+    //                     let rgb_addr = unsafe {
+    //                         RGB_MAPS
+    //                             .as_ptr()
+    //                             .offset(((attr.0 as isize) * 256_isize) + (w as isize))
+    //                     };
+    //                     let rgb_word = unsafe { *rgb_addr };
+    //                     hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
+    //                 }
+    //             }
+    //         }
 
-            // Right border
-            hw.write_pixels(0xFF, 0xFF, 0xFF);
-        }
-    }
+    //         // Right border
+    //         hw.write_pixels(0xFF, 0xFF, 0xFF);
+    //     }
+    // }
 
     /// Change the current font
     pub fn set_custom_font(&mut self, new_font: Option<&'static [u8]>) {
