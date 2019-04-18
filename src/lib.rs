@@ -309,6 +309,22 @@ where
         self.clear();
     }
 
+    pub fn borrow_hw_mut(&mut self) -> Option<&mut T> {
+        if let Some(x) = &mut self.hw {
+            Some(x)
+        } else {
+            None
+        }
+    }
+
+    pub fn borrow_hw(&self) -> Option<&T> {
+        if let Some(x) = &self.hw {
+            Some(x)
+        } else {
+            None
+        }
+    }
+
     pub fn set_cursor_visible(&mut self, visible: bool) {
         if visible != self.cursor_visible {
             if visible {
