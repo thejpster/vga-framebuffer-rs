@@ -159,7 +159,7 @@ pub trait Hardware {
     fn vsync_off(&mut self);
 
     /// Called word by word as pixels are calculated
-    fn write_pixels(&mut self, red: u32, green: u32, blue: u32);
+    fn write_pixels(&mut self, xrgb: XRGBColour);
 }
 
 /// A point on the screen.
@@ -199,6 +199,66 @@ pub enum Colour {
     Black = 0,
 }
 
+impl Colour {
+    /// Generate 8 pixels in RGB which are all this colour
+    pub fn into_pixels(self) -> XRGBColour {
+        match self {
+            Colour::White => XRGBColour::new(0xFF, 0xFF, 0xFF),
+            Colour::Yellow => XRGBColour::new(0xFF, 0xFF, 0x00),
+            Colour::Magenta => XRGBColour::new(0xFF, 0x00, 0xFF),
+            Colour::Red => XRGBColour::new(0xFF, 0x00, 0x00),
+            Colour::Cyan => XRGBColour::new(0x00, 0xFF, 0xFF),
+            Colour::Green => XRGBColour::new(0x00, 0xFF, 0x00),
+            Colour::Blue => XRGBColour::new(0x00, 0x00, 0xFF),
+            Colour::Black => XRGBColour::new(0x00, 0x00, 0x00),
+        }
+    }
+}
+
+/// Represents 8 pixels, each of which can be any 3-bit RGB colour
+#[derive(Debug, Copy, Clone)]
+pub struct XRGBColour(pub u32);
+
+impl XRGBColour {
+    /// Create a new block of 8 coloured pixels by mixing 8 red/black pixels,
+    /// 8 green/black pixels and 8 blue/black pixels.
+    pub const fn new(red: u8, green: u8, blue: u8) -> XRGBColour {
+        XRGBColour (
+            ((red as u32) << 16) | ((green as u32) << 8) | (blue as u32)
+        )
+    }
+
+    /// Get the 8 red/black pixels
+    pub const fn red(self) -> u8 {
+        (self.0 >> 16) as u8
+    }
+
+    /// Get the 8 green/black pixels
+    pub const fn green(self) -> u8 {
+        (self.0 >> 8) as u8
+    }
+
+    /// Get the 8 blue/black pixels
+    pub const fn blue(self) -> u8 {
+        (self.0 >> 0) as u8
+    }
+
+    /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
+    pub const fn pixel_has_red(self, pixel: u8) -> bool {
+        ((self.0 >> (16 + (7 - pixel))) & 1) == 1
+    }
+
+    /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
+    pub const fn pixel_has_green(self, pixel: u8) -> bool {
+        ((self.0 >> (8 + (7 - pixel))) & 1) == 1
+    }
+
+    /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
+    pub const fn pixel_has_blue(self, pixel: u8) -> bool {
+        ((self.0 >> (7 - pixel)) & 1) == 1
+    }
+}
+
 impl Attr {
     const FG_BITS: u8 = 0b00111000;
     const BG_BITS: u8 = 0b00000111;
@@ -231,7 +291,7 @@ impl core::default::Default for Attr {
     }
 }
 
-static RGB_MAPS: [u32; 256 * 64] = include!("maps.txt");
+static RGB_MAPS: [XRGBColour; 256 * 64] = include!("maps.txt");
 
 /// Represents Mode2 1-bpp graphics
 pub struct Mode2<'a> {
@@ -253,7 +313,8 @@ where
 {
     line_no: AtomicUsize,
     frame: usize,
-    text_buffer: [TextRow; TEXT_NUM_ROWS],
+    // Add one extra row because 600 doesn't divide by 16
+    text_buffer: [TextRow; TEXT_NUM_ROWS + 1],
     hw: Option<T>,
     attr: Attr,
     pos: Position,
@@ -278,7 +339,7 @@ where
                 text_buffer: [TextRow {
                     double_height: DoubleHeightMode::Normal,
                     glyphs: [(Char::Null, DEFAULT_ATTR); TEXT_NUM_COLS],
-                }; TEXT_NUM_ROWS],
+                }; TEXT_NUM_ROWS + 1],
                 hw: None,
                 pos: Position {
                     row: Row(0),
@@ -401,23 +462,20 @@ where
 
     /// Call this at the start of every line.
     pub fn isr_sol(&mut self) {
-        let current_line = self.line_no.fetch_add(1, Ordering::Relaxed);
-
-        match current_line {
-            V_BACK_PORCH_FIRST => {
-                if let Some(ref mut hw) = self.hw {
-                    hw.vsync_off();
-                }
+        match self.line_no.load(Ordering::Relaxed) {
+            V_BOTTOM_BORDER_FIRST...V_BOTTOM_BORDER_LAST => {
+                self.solid_line();
             }
             V_TOP_BORDER_FIRST...V_TOP_BORDER_LAST => {
                 self.solid_line();
             }
             V_DATA_FIRST...V_DATA_LAST => {
-                let line = current_line - V_DATA_FIRST;
-                self.calculate_pixels(line);
+                self.calculate_pixels();
             }
-            V_BOTTOM_BORDER_FIRST...V_BOTTOM_BORDER_LAST => {
-                self.solid_line();
+            V_BACK_PORCH_FIRST => {
+                if let Some(ref mut hw) = self.hw {
+                    hw.vsync_off();
+                }
             }
             V_FRONT_PORCH_FIRST => {
                 // End of visible frame - increment counter
@@ -434,6 +492,7 @@ where
                 // No output on this line
             }
         }
+        self.line_no.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Calculate a solid line of pixels for the border.
@@ -442,7 +501,7 @@ where
         if let Some(ref mut hw) = self.hw {
             // Middle bit
             for _ in 0..HORIZONTAL_OCTETS {
-                hw.write_pixels(0xFF, 0xFF, 0xFF);
+                hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
             }
         }
     }
@@ -451,13 +510,25 @@ where
     ///
     /// Converts each glyph into 8 pixels, then pushes them out as RGB
     /// triplets to the callback function (to be buffered).
-    fn calculate_pixels(&mut self, line: usize) {
+    fn calculate_pixels(&mut self) {
+        let line = self.line_no.load(Ordering::Relaxed) - V_DATA_FIRST;
         let text_row = line / MAX_FONT_HEIGHT;
-        let mut font_row = line % MAX_FONT_HEIGHT;
+        let row = &self.text_buffer[text_row];
+        let font_row = match row.double_height {
+            DoubleHeightMode::Normal => {
+                line % MAX_FONT_HEIGHT
+            }
+            DoubleHeightMode::Top => {
+                (line % MAX_FONT_HEIGHT) / 2
+            }
+            DoubleHeightMode::Bottom => {
+                ((line % MAX_FONT_HEIGHT) + MAX_FONT_HEIGHT) / 2
+            }
+        };
         let font_table = self.font.unwrap_or(freebsd_cp850::FONT_DATA.as_ptr());
         if let Some(ref mut hw) = self.hw {
             // Left border
-            hw.write_pixels(0xFF, 0xFF, 0xFF);
+            hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
 
             let mut need_text = true;
             if let Some(mode2) = self.mode2.as_ref() {
@@ -489,7 +560,7 @@ where
                                 .offset(((attr.0 as isize) * 256_isize) + (w as isize))
                         };
                         let rgb_word = unsafe { *rgb_addr };
-                        hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
+                        hw.write_pixels(rgb_word);
                     }
                     need_text = false;
                 }
@@ -497,38 +568,26 @@ where
 
             if need_text {
                 // Characters in the middle
-                if text_row < TEXT_NUM_ROWS {
-                    let row = &self.text_buffer[text_row];
-                    match row.double_height {
-                        DoubleHeightMode::Normal => {}
-                        DoubleHeightMode::Top => {
-                            font_row = font_row / 2;
-                        }
-                        DoubleHeightMode::Bottom => {
-                            font_row = (font_row + MAX_FONT_HEIGHT) / 2;
-                        }
+                let font_table = unsafe { font_table.offset(font_row as isize) };
+                for (ch, attr) in row.glyphs.iter() {
+                    let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
+                    let mono_pixels = unsafe { *font_table.offset(index) };
+                    // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
+                    // Each row is 4 bytes. The row index is
+                    // 0bFFFBBBPPPPPPPP, where F = foreground, B =
+                    // background, P = 8-bit pixels.
+                    let rgb_addr = unsafe {
+                        RGB_MAPS
+                            .as_ptr()
+                            .offset(((attr.0 as isize) * 256_isize) + (mono_pixels as isize))
                     };
-                    let font_table = unsafe { font_table.offset(font_row as isize) };
-                    for (ch, attr) in row.glyphs.iter() {
-                        let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
-                        let w = unsafe { *font_table.offset(index) };
-                        // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
-                        // Each row is 4 bytes. The row index is
-                        // 0bFFFBBBPPPPPPPP, where F = foreground, B =
-                        // background, P = 8-bit pixels.
-                        let rgb_addr = unsafe {
-                            RGB_MAPS
-                                .as_ptr()
-                                .offset(((attr.0 as isize) * 256_isize) + (w as isize))
-                        };
-                        let rgb_word = unsafe { *rgb_addr };
-                        hw.write_pixels(rgb_word >> 16, rgb_word >> 8, rgb_word);
-                    }
+                    let rgb_word = unsafe { *rgb_addr };
+                    hw.write_pixels(rgb_word);
                 }
             }
 
             // Right border
-            hw.write_pixels(0xFF, 0xFF, 0xFF);
+            hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
         }
     }
 

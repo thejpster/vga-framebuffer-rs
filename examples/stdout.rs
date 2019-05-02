@@ -1,7 +1,7 @@
 extern crate term;
 extern crate vga_framebuffer;
 
-use vga_framebuffer::{AsciiConsole, Attr, Col, Colour, Position, Row};
+use vga_framebuffer::{XRGBColour, AsciiConsole, Attr, Col, Colour, Position, Row};
 
 mod rust_logo;
 
@@ -29,12 +29,12 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
     }
 
     /// Called when pixels need to be written to the output pin.
-    fn write_pixels(&mut self, red: u32, green: u32, blue: u32) {
+    fn write_pixels(&mut self, pixels: XRGBColour) {
         let mut old_colour = None;
-        for bit in (0..8).rev() {
-            let red_bit = red & (1 << bit) != 0;
-            let blue_bit = blue & (1 << bit) != 0;
-            let green_bit = green & (1 << bit) != 0;
+        for bit in 0..8 {
+            let red_bit = pixels.pixel_has_red(bit);
+            let blue_bit = pixels.pixel_has_blue(bit);
+            let green_bit = pixels.pixel_has_green(bit);
             let colour: u8 = ((red_bit as u8) << 2) + ((green_bit as u8) << 1) + (blue_bit as u8);
             if old_colour != Some(colour) {
                 match colour {
@@ -65,7 +65,7 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
                 }
                 old_colour = Some(colour);
             }
-            write!(self.output, "@@").unwrap();
+            write!(self.output, "█").unwrap();
         }
         self.col += 1;
         if self.col == vga_framebuffer::HORIZONTAL_OCTETS {
