@@ -223,24 +223,22 @@ impl XRGBColour {
     /// Create a new block of 8 coloured pixels by mixing 8 red/black pixels,
     /// 8 green/black pixels and 8 blue/black pixels.
     pub const fn new(red: u8, green: u8, blue: u8) -> XRGBColour {
-        XRGBColour (
-            ((red as u32) << 16) | ((green as u32) << 8) | (blue as u32)
-        )
+        XRGBColour(((red as u32) << 16) | ((green as u32) << 8) | (blue as u32))
     }
 
-    /// Get the 8 red/black pixels
-    pub const fn red(self) -> u8 {
-        (self.0 >> 16) as u8
+    /// Get the 8 red/black pixels in the bottom 8 bits
+    pub const fn red(self) -> u32 {
+        (self.0 >> 16) & 0xFF
     }
 
-    /// Get the 8 green/black pixels
-    pub const fn green(self) -> u8 {
-        (self.0 >> 8) as u8
+    /// Get the 8 green/black pixels in the bottom 8 bits
+    pub const fn green(self) -> u32 {
+        (self.0 >> 8) & 0xFF
     }
 
-    /// Get the 8 blue/black pixels
-    pub const fn blue(self) -> u8 {
-        (self.0 >> 0) as u8
+    /// Get the 8 blue/black pixels in the bottom 8 bits
+    pub const fn blue(self) -> u32 {
+        self.0 & 0xFF
     }
 
     /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
@@ -463,13 +461,13 @@ where
     /// Call this at the start of every line.
     pub fn isr_sol(&mut self) {
         match self.line_no.load(Ordering::Relaxed) {
-            V_BOTTOM_BORDER_FIRST...V_BOTTOM_BORDER_LAST => {
+            V_BOTTOM_BORDER_FIRST..=V_BOTTOM_BORDER_LAST => {
                 self.solid_line();
             }
-            V_TOP_BORDER_FIRST...V_TOP_BORDER_LAST => {
+            V_TOP_BORDER_FIRST..=V_TOP_BORDER_LAST => {
                 self.solid_line();
             }
-            V_DATA_FIRST...V_DATA_LAST => {
+            V_DATA_FIRST..=V_DATA_LAST => {
                 self.calculate_pixels();
             }
             V_BACK_PORCH_FIRST => {
@@ -515,15 +513,9 @@ where
         let text_row = line / MAX_FONT_HEIGHT;
         let row = &self.text_buffer[text_row];
         let font_row = match row.double_height {
-            DoubleHeightMode::Normal => {
-                line % MAX_FONT_HEIGHT
-            }
-            DoubleHeightMode::Top => {
-                (line % MAX_FONT_HEIGHT) / 2
-            }
-            DoubleHeightMode::Bottom => {
-                ((line % MAX_FONT_HEIGHT) + MAX_FONT_HEIGHT) / 2
-            }
+            DoubleHeightMode::Normal => line % MAX_FONT_HEIGHT,
+            DoubleHeightMode::Top => (line % MAX_FONT_HEIGHT) / 2,
+            DoubleHeightMode::Bottom => ((line % MAX_FONT_HEIGHT) + MAX_FONT_HEIGHT) / 2,
         };
         let font_table = self.font.unwrap_or(freebsd_cp850::FONT_DATA.as_ptr());
         if let Some(ref mut hw) = self.hw {
