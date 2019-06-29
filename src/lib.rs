@@ -63,11 +63,10 @@ pub use console_traits::*;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 // See http://tinyvga.com/vga-timing/800x600@60Hz
-// These values have been adjusted to assume a 20 MHz pixel clock
-const H_VISIBLE_AREA: u32 = 400;
-const H_FRONT_PORCH: u32 = 20;
-const H_SYNC_PULSE: u32 = 64;
-const H_BACK_PORCH: u32 = 44;
+const H_VISIBLE_AREA: u32 = 800;
+const H_FRONT_PORCH: u32 = 40;
+const H_SYNC_PULSE: u32 = 128;
+const H_BACK_PORCH: u32 = 88;
 const H_WHOLE_LINE: u32 = H_VISIBLE_AREA + H_FRONT_PORCH + H_SYNC_PULSE + H_BACK_PORCH;
 const V_VISIBLE_AREA: usize = 600;
 const V_FRONT_PORCH: usize = 1;
@@ -89,7 +88,7 @@ const V_BOTTOM_BORDER_FIRST: usize = V_DATA_FIRST + (MAX_FONT_HEIGHT * TEXT_NUM_
 const V_BOTTOM_BORDER_LAST: usize = V_FRONT_PORCH_FIRST - 1;
 const V_FRONT_PORCH_FIRST: usize = V_BOTTOM_BORDER_FIRST + V_BOTTOM_BORDER;
 
-const PIXEL_CLOCK: u32 = 20_000_000;
+const PIXEL_CLOCK: u32 = 40_000_000;
 
 /// Top/bottom border height
 pub const TOP_BOTTOM_BORDER_HEIGHT: usize = 12;
@@ -108,12 +107,12 @@ pub const MAX_Y: usize = USABLE_LINES - 1;
 pub const MAX_X: usize = USABLE_COLS - 1;
 
 /// How many words in a line (including the border)
-pub const HORIZONTAL_OCTETS: usize = 50;
+pub const HORIZONTAL_OCTETS: usize = 80;
 /// How many words in a line (excluding the border)
-pub const USABLE_HORIZONTAL_OCTETS: usize = 48;
+pub const USABLE_HORIZONTAL_OCTETS: usize = 78;
 
 /// How many characters in a row
-pub const TEXT_NUM_COLS: usize = USABLE_COLS / MAX_FONT_WIDTH;
+pub const TEXT_NUM_COLS: usize = USABLE_HORIZONTAL_OCTETS;
 /// Highest X co-ord for text
 pub const TEXT_MAX_COL: usize = TEXT_NUM_COLS - 1;
 /// How many rows of characters on the screen
@@ -160,6 +159,12 @@ pub trait Hardware {
 
     /// Called word by word as pixels are calculated
     fn write_pixels(&mut self, xrgb: XRGBColour);
+
+    /// Called to write out a whole block, not just 8 bits of it
+    fn write_solid(&mut self);
+
+    /// Called word by word as pixels are calculated (in mono mode)
+    fn write_mono_pixels(&mut self, pixels: u8);
 }
 
 /// A point on the screen.
@@ -258,8 +263,8 @@ impl XRGBColour {
 }
 
 impl Attr {
-    const FG_BITS: u8 = 0b00111000;
-    const BG_BITS: u8 = 0b00000111;
+    const FG_BITS: u8 = 0b0011_1000;
+    const BG_BITS: u8 = 0b0000_0111;
 
     const_ft! {
         pub fn new(fg: Colour, bg: Colour) -> Attr {
@@ -405,7 +410,7 @@ where
         let length = buffer.len();
         let buffer_lines = length / USABLE_HORIZONTAL_OCTETS;
         let mode2 = Mode2 {
-            buffer: buffer,
+            buffer,
             start: start_line,
             // Framebuffer is line-doubled
             end: start_line + (2 * buffer_lines),
@@ -499,7 +504,7 @@ where
         if let Some(ref mut hw) = self.hw {
             // Middle bit
             for _ in 0..HORIZONTAL_OCTETS {
-                hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
+                hw.write_solid();
             }
         }
     }
@@ -520,66 +525,67 @@ where
         let font_table = self.font.unwrap_or(freebsd_cp850::FONT_DATA.as_ptr());
         if let Some(ref mut hw) = self.hw {
             // Left border
-            hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
+            hw.write_solid();
 
-            let mut need_text = true;
-            if let Some(mode2) = self.mode2.as_ref() {
-                if line >= mode2.start && line < mode2.end && text_row < TEXT_NUM_ROWS {
-                    // Pixels in the middle
+            // let mut need_text = true;
+            // if let Some(mode2) = self.mode2.as_ref() {
+            //     if line >= mode2.start && line < mode2.end && text_row < TEXT_NUM_ROWS {
+            //         // Pixels in the middle
 
-                    // Our framebuffer is line-doubled
-                    let framebuffer_line = (line - mode2.start) >> 1;
+            //         // Our framebuffer is line-doubled
+            //         let framebuffer_line = (line - mode2.start) >> 1;
 
-                    // Find the block of bytes for this scan-line
-                    let start = framebuffer_line * USABLE_HORIZONTAL_OCTETS;
-                    let framebuffer_bytes =
-                        &mode2.buffer[start..(start + USABLE_HORIZONTAL_OCTETS)];
+            //         // Find the block of bytes for this scan-line
+            //         let start = framebuffer_line * USABLE_HORIZONTAL_OCTETS;
+            //         let framebuffer_bytes =
+            //             &mode2.buffer[start..(start + USABLE_HORIZONTAL_OCTETS)];
 
-                    // Write out the bytes with colour from the text-buffer
-                    for ((_, attr), bitmap) in self.text_buffer[text_row]
-                        .glyphs
-                        .iter()
-                        .zip(framebuffer_bytes.iter())
-                    {
-                        let w = *bitmap;
-                        // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
-                        // Each row is 4 bytes. The row index is
-                        // 0bFFFBBBPPPPPPPP, where F = foreground, B =
-                        // background, P = 8-bit pixels.
-                        let rgb_addr = unsafe {
-                            RGB_MAPS
-                                .as_ptr()
-                                .offset(((attr.0 as isize) * 256_isize) + (w as isize))
-                        };
-                        let rgb_word = unsafe { *rgb_addr };
-                        hw.write_pixels(rgb_word);
-                    }
-                    need_text = false;
-                }
+            //         // Write out the bytes with colour from the text-buffer
+            //         for ((_, attr), bitmap) in self.text_buffer[text_row]
+            //             .glyphs
+            //             .iter()
+            //             .zip(framebuffer_bytes.iter())
+            //         {
+            //             let w = *bitmap;
+            //             // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
+            //             // Each row is 4 bytes. The row index is
+            //             // 0bFFFBBBPPPPPPPP, where F = foreground, B =
+            //             // background, P = 8-bit pixels.
+            //             let rgb_addr = unsafe {
+            //                 RGB_MAPS
+            //                     .as_ptr()
+            //                     .offset(((attr.0 as isize) * 256_isize) + (w as isize))
+            //             };
+            //             let rgb_word = unsafe { *rgb_addr };
+            //             hw.write_pixels(rgb_word);
+            //         }
+            //         need_text = false;
+            //     }
+            // }
+
+            // if need_text {
+            // Characters in the middle
+            let font_table = unsafe { font_table.offset(font_row as isize) };
+            for (ch, _attr) in row.glyphs.iter() {
+                let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
+                let mono_pixels = unsafe { *font_table.offset(index) };
+                // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
+                // Each row is 4 bytes. The row index is
+                // 0bFFFBBBPPPPPPPP, where F = foreground, B =
+                // background, P = 8-bit pixels.
+                // let rgb_addr = unsafe {
+                //     RGB_MAPS
+                //         .as_ptr()
+                //         .offset(((attr.0 as isize) * 256_isize) + (mono_pixels as isize))
+                // };
+                // let rgb_word = unsafe { *rgb_addr };
+                // hw.write_pixels(rgb_word);
+                hw.write_mono_pixels(mono_pixels);
             }
-
-            if need_text {
-                // Characters in the middle
-                let font_table = unsafe { font_table.offset(font_row as isize) };
-                for (ch, attr) in row.glyphs.iter() {
-                    let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
-                    let mono_pixels = unsafe { *font_table.offset(index) };
-                    // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
-                    // Each row is 4 bytes. The row index is
-                    // 0bFFFBBBPPPPPPPP, where F = foreground, B =
-                    // background, P = 8-bit pixels.
-                    let rgb_addr = unsafe {
-                        RGB_MAPS
-                            .as_ptr()
-                            .offset(((attr.0 as isize) * 256_isize) + (mono_pixels as isize))
-                    };
-                    let rgb_word = unsafe { *rgb_addr };
-                    hw.write_pixels(rgb_word);
-                }
-            }
+            // }
 
             // Right border
-            hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
+            hw.write_solid();
         }
     }
 
