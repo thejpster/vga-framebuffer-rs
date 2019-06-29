@@ -19,9 +19,9 @@ This crate is written to be hardware-agnostic.
 ## The Specs:
 
 * 800 x 600 @ 60 Hz output signal with a 40 MHz pixel clock
+* 400 x 600 effective resolution (runs pixel clock at half-speed)
 * 8-colour RGB output (Red, Green, Blue, Cyan, Magenta, Yellow, Black and White)
-* Double-width horizontal pixels, giving 400 x 600 output
-* 8x16 font glyphs
+* 8x16 bitmap glyphs, from FreeBSD console font
 * MS-DOS CodePage 850 character set
 * 48 column x 36 row text output
 * One foreground/background pair stored *per* character cell
