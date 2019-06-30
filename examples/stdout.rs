@@ -1,7 +1,7 @@
 extern crate term;
 extern crate vga_framebuffer;
 
-use vga_framebuffer::{XRGBColour, AsciiConsole, Attr, Col, Colour, Position, Row};
+use vga_framebuffer::{AsciiConsole, Attr, Col, Colour, Position, Row, XRGBColour};
 
 mod rust_logo;
 
@@ -26,6 +26,27 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
     /// Called when V-Sync needs to be low.
     fn vsync_off(&mut self) {
         println!("vsync_off");
+    }
+
+    /// Called when pixels need to be written to the output pin.
+    fn write_solid(&mut self) {
+        self.write_mono_pixels(0x3FF);
+    }
+
+    /// Called when pixels need to be written to the output pin.
+    fn write_mono_pixels(&mut self, pixels: u16) {
+        for bit in 0..=9 {
+            if (pixels & (1 << (9 - bit))) != 0 {
+                write!(self.output, "█").unwrap();
+            } else {
+                write!(self.output, " ").unwrap();
+            }
+        }
+        self.col += 1;
+        if self.col == vga_framebuffer::HORIZONTAL_OCTETS {
+            self.col = 0;
+            println!();
+        }
     }
 
     /// Called when pixels need to be written to the output pin.
@@ -137,7 +158,7 @@ fn main() {
 
     fb.clear();
 
-    fb.set_custom_font(Some(&vga_framebuffer::freebsd_teletext::FONT_DATA));
+    fb.set_custom_font(Some(&vga_framebuffer::freebsd_teletext_8x16::FONT_DATA));
 
     writeln!(fb, "This is teletext").unwrap();
     for ch in 0x80..=0xFF {
