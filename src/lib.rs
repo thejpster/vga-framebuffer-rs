@@ -1,18 +1,44 @@
-//! VGA Frame Buffer for Embedded Microcontrollers
+//! # VGA Frame Buffer for Embedded Microcontrollers
 //!
-//! Generates an 800 x 600 @ 60 Hz SVGA signal from a 48 column x 36 row
-//! monochrome text buffer. The image has a border.
+//! This is designed for a system with a 40 MHz system clock, or some multiple
+//! thereof. The nominal output is an 800 x 600 @ 60 Hz SVGA signal, with 3
+//! bits per pixel. Because that requires a very large amount of frame buffer
+//! ( 800 x 600 x 3 / 8 = 175 KiB ), we offer a few graphics modes which all
+//! generate a compatible signal which may double or quadruple the pixel
+//! width, or repeat lines. Some modes also use a border.
+//!
+//! # Video Modes
+//!
+//! ## 48 x 36 colour text mode (Mode 0)
+//!
+//! Each text cell has an 8-bit character, a 3-bit foreground colour and a
+//! 3-bit background colour. With an 8x16 font, we run the pixel clock at half
+//! speed to double the width of each character (so they are effectively 16x16
+//! glyphs). You can optionally swap the font, supplying a `[u8; 256 * 16]`.
+//! We include the FreeBSD Console Font (Code Page 850) and a Teletext font.
+//!
+//! ## 384 x 288 block-colour graphics mode (Mode 1)
+//!
+//! An extension of Mode 0, here you supply a 384 x 288 mono bitmap which is
+//! used as a source for the foreground/background rather than using the
+//! character cells and the font. You can also specify which scan lines on
+//! screen the bitmap is attached, allowing part graphics, part text modes
+//! (e.g. for flight sims, or Turtle graphics).
+//!
+//! ## 80 x 36 mono text mode (Mode 2)
+//!
+//! Each text cell has an 8-bit character but no attributes. With a 10x16
+//! font, we run the pixel clock at the full 40 MHz speed to get an 80 column
+//! display, but we don't have enough CPU time on an 80 MHz Tiva-C for
+//! anything other that white/black. You can optionally swap the font,
+//! supplying a `[u16; 256 * 24]`. We supply a font which is a mix of Lucida
+//! Console 10x16 and 8x16 FreeBSD Console (Code Page 850).
 //!
 //! TODO: Implement smooth scrolling in the vertical direction with an extra
 //! text row.
 //!
-//!
-//! Width = 400 double width pixels => 400 = 8 + (48 x 8) + 8
-//!
-//! Height = 600 pixels => 600 = 12 + (36 x 16) + 12
-//!
 //! ```ignore
-//! <-------------- 400 px, pixel doubled to 800 px ------------->
+//! <------------------------ 800 px ---------------------------->
 //! +------------------------------------------------------------+
 //! |<--> 8 pixel border     ^                8 pixel border <-->|
 //! |                        | 12 px border                      |
@@ -55,8 +81,9 @@ extern crate console_traits;
 extern crate const_ft;
 
 mod charset;
-pub mod freebsd_cp850;
-pub mod freebsd_teletext;
+pub mod freebsd_cp850_10x16;
+pub mod freebsd_cp850_8x16;
+pub mod freebsd_teletext_8x16;
 
 pub use charset::*;
 pub use console_traits::*;
@@ -142,6 +169,10 @@ pub trait Hardware {
     /// `vsync_on` and `vsync_off` which this code will call at the
     /// appropriate time.
     ///
+    /// Note this function may be called when changing video modes, so make
+    /// sure your implementation can handle that (e.g. by disabling interrupts
+    /// before modifying the peripheral state).
+    ///
     /// * `width` - length of a line (in `clock_rate` pixels)
     /// * `sync_end` - elapsed time (in `clock_rate` pixels) before H-Sync
     ///   needs to fall
@@ -164,7 +195,7 @@ pub trait Hardware {
     fn write_solid(&mut self);
 
     /// Called word by word as pixels are calculated (in mono mode)
-    fn write_mono_pixels(&mut self, pixels: u8);
+    fn write_mono_pixels(&mut self, pixels: u16);
 }
 
 /// A point on the screen.
@@ -522,7 +553,7 @@ where
             DoubleHeightMode::Top => (line % MAX_FONT_HEIGHT) / 2,
             DoubleHeightMode::Bottom => ((line % MAX_FONT_HEIGHT) + MAX_FONT_HEIGHT) / 2,
         };
-        let font_table = self.font.unwrap_or(freebsd_cp850::FONT_DATA.as_ptr());
+        let font_table = freebsd_cp850_10x16::FONT_DATA.as_ptr();
         if let Some(ref mut hw) = self.hw {
             // Left border
             hw.write_solid();
@@ -565,7 +596,7 @@ where
 
             // if need_text {
             // Characters in the middle
-            let font_table = unsafe { font_table.offset(font_row as isize) };
+            let font_table = unsafe { font_table.add(font_row) };
             for (ch, _attr) in row.glyphs.iter() {
                 let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
                 let mono_pixels = unsafe { *font_table.offset(index) };
