@@ -17,6 +17,27 @@
 //! glyphs). You can optionally swap the font, supplying a `[u8; 256 * 16]`.
 //! We include the FreeBSD Console Font (Code Page 850) and a Teletext font.
 //!
+//! ```ignore
+//! <------------------------ 400 px ---------------------------->
+//! +------------------------------------------------------------+
+//! |<--> 8 pixel border     ^                8 pixel border <-->|
+//! |                        | 12 px border                      |
+//! |                        v                                   |
+//! |    +--------------------------------------------------+    |
+//! |    | <--^------ 48 chars x 8 px = 384  px ----------->|    |
+//! |    |    |                                             |    |
+//! |    |    |                                             |    |
+//! |    |    | 36 rows x 16 px = 576 px                    |    |
+//! |    |    |                                             |    |
+//! |    |    |                                             |    |
+//! |    |    v                                             |    |
+//! |    +--------------------------------------------------+    |
+//! |                          ^                                 |
+//! |                          | 12 px border                    |
+//! |                          v                                 |
+//! +------------------------------------------------------------+
+//! ```
+//!
 //! ## 384 x 288 block-colour graphics mode (Mode 1)
 //!
 //! An extension of Mode 0, here you supply a 384 x 288 mono bitmap which is
@@ -24,6 +45,27 @@
 //! character cells and the font. You can also specify which scan lines on
 //! screen the bitmap is attached, allowing part graphics, part text modes
 //! (e.g. for flight sims, or Turtle graphics).
+//!
+//! ```ignore
+//! <------------------------ 400 px ---------------------------->
+//! +------------------------------------------------------------+
+//! |<--> 8 pixel border     ^                8 pixel border <-->|
+//! |                        | 12 px border                      |
+//! |                        v                                   |
+//! |    +--------------------------------------------------+    |
+//! |    | <--^---------------- 384  px ------------------->|    |
+//! |    |    |                                             |    |
+//! |    |    |                                             |    |
+//! |    |    | 288 px doubled                              |    |
+//! |    |    |                                             |    |
+//! |    |    |                                             |    |
+//! |    |    v                                             |    |
+//! |    +--------------------------------------------------+    |
+//! |                          ^                                 |
+//! |                          | 12 px border                    |
+//! |                          v                                 |
+//! +------------------------------------------------------------+
+//! ```
 //!
 //! ## 80 x 36 mono text mode (Mode 2)
 //!
@@ -40,18 +82,18 @@
 //! ```ignore
 //! <------------------------ 800 px ---------------------------->
 //! +------------------------------------------------------------+
-//! |<--> 8 pixel border     ^                8 pixel border <-->|
+//! |                        ^                                   |
 //! |                        | 12 px border                      |
 //! |                        v                                   |
-//! |    +--------------------------------------------------+    |
-//! |    | <--^------ 48 chars x 8 px = 384  px ----------->|    |
-//! |    |    |                                             |    |
-//! |    |    |                                             |    |
-//! |    |    | 36 rows x 16 px = 576 px                    |    |
-//! |    |    |                                             |    |
-//! |    |    |                                             |    |
-//! |    |    v                                             |    |
-//! |    +--------------------------------------------------+    |
+//! +------------------------------------------------------------+
+//! | <-------^------ 80 chars x 10 px = 800  px --------------->|
+//! |         |                                                  |
+//! |         |                                                  |
+//! |         | 36 rows x 16 px = 576 px                         |
+//! |         |                                                  |
+//! |         |                                                  |
+//! |         v                                                  |
+//! +------------------------------------------------------------+
 //! |                          ^                                 |
 //! |                          | 12 px border                    |
 //! |                          v                                 |
@@ -136,7 +178,7 @@ pub const MAX_X: usize = USABLE_COLS - 1;
 /// How many words in a line (including the border)
 pub const HORIZONTAL_OCTETS: usize = 80;
 /// How many words in a line (excluding the border)
-pub const USABLE_HORIZONTAL_OCTETS: usize = 78;
+pub const USABLE_HORIZONTAL_OCTETS: usize = 80;
 
 /// How many characters in a row
 pub const TEXT_NUM_COLS: usize = USABLE_HORIZONTAL_OCTETS;
@@ -555,9 +597,6 @@ where
         };
         let font_table = freebsd_cp850_10x16::FONT_DATA.as_ptr();
         if let Some(ref mut hw) = self.hw {
-            // Left border
-            hw.write_solid();
-
             // let mut need_text = true;
             // if let Some(mode2) = self.mode2.as_ref() {
             //     if line >= mode2.start && line < mode2.end && text_row < TEXT_NUM_ROWS {
@@ -614,9 +653,6 @@ where
                 hw.write_mono_pixels(mono_pixels);
             }
             // }
-
-            // Right border
-            hw.write_solid();
         }
     }
 
