@@ -38,6 +38,10 @@
 //! +------------------------------------------------------------+
 //! ```
 //!
+//! When you select this mode, you can supply a font in the form of an array
+//! of `256 * 16` bytes, where each block of 16 bytes are the 16 rows of a
+//! glyph.
+//!
 //! ## 384 x 288 block-colour graphics mode (Mode 1)
 //!
 //! An extension of Mode 0, here you supply a 384 x 288 mono bitmap which is
@@ -76,8 +80,10 @@
 //! supplying a `[u16; 256 * 24]`. We supply a font which is a mix of Lucida
 //! Console 10x16 and 8x16 FreeBSD Console (Code Page 850).
 //!
-//! TODO: Implement smooth scrolling in the vertical direction with an extra
-//! text row.
+//! When you select this mode, you can supply a font in the form of an array
+//! of `256 * 16 * 2` bytes, where each block of 32 bytes are the 16 rows of a
+//! glyph. Only the right hand (least significant) 10 bits of each two-byte
+//! row are rendered.
 //!
 //! ```ignore
 //! <------------------------ 800 px ---------------------------->
@@ -100,12 +106,7 @@
 //! +------------------------------------------------------------+
 //! ```
 //!
-//! Requires pixels to be emitted with a 20 MHz pixel clock (against a nominal
-//! 40 MHz pixel clock, in order to acheive the horizontal doubling).
-//!
-//! In order to maintain performance, only one font size is supported: 8x16
-//! pixels. But you can substitute your own font if required (e.g. for
-//! Teletext support).
+//! ## Cursor support
 //!
 //! There is optional cursor support. Rather than try and check each text cell
 //! at render time to see if it is in the cursor position, we swap chars in
