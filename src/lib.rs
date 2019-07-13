@@ -258,8 +258,8 @@ impl XRGBColour {
 }
 
 impl Attr {
-    const FG_BITS: u8 = 0b00111000;
-    const BG_BITS: u8 = 0b00000111;
+    const FG_BITS: u8 = 0b0011_1000;
+    const BG_BITS: u8 = 0b0000_0111;
 
     const_ft! {
         pub fn new(fg: Colour, bg: Colour) -> Attr {
@@ -275,6 +275,10 @@ impl Attr {
     pub fn set_bg(&mut self, bg: Colour) -> &mut Attr {
         self.0 = (self.0 & !Self::BG_BITS) + (bg as u8);
         self
+    }
+
+    pub fn as_u8(self) -> u8 {
+        self.0
     }
 }
 
@@ -405,7 +409,7 @@ where
         let length = buffer.len();
         let buffer_lines = length / USABLE_HORIZONTAL_OCTETS;
         let mode2 = Mode2 {
-            buffer: buffer,
+            buffer,
             start: start_line,
             // Framebuffer is line-doubled
             end: start_line + (2 * buffer_lines),
@@ -617,6 +621,22 @@ where
             if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
                 self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
                     (glyph, attr.unwrap_or(self.attr));
+            }
+        }
+    }
+
+    /// Read a glyph on screen at the specified place
+    pub fn read_glyph_at(&mut self, pos: Position) -> Option<(Char, Attr)> {
+        if self.cursor_visible && (pos.row == self.pos.row) && (pos.col == self.pos.col) {
+            Some((
+                self.under_cursor,
+                self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize].1,
+            ))
+        } else {
+            if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
+                Some(self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize])
+            } else {
+                None
             }
         }
     }
