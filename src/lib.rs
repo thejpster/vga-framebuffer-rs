@@ -355,6 +355,10 @@ impl Attr {
         self.0 = (self.0 & !Self::BG_BITS) + (bg as u8);
         self
     }
+
+    pub fn as_u8(self) -> u8 {
+        self.0
+    }
 }
 
 // White on Blue
@@ -392,6 +396,8 @@ where
     frame: usize,
     // Add one extra row because 600 doesn't divide by 16
     text_buffer: [TextRow; TEXT_NUM_ROWS + 1],
+    // Allows us to map any visible line to any other visible line.
+    roller_buffer: [u16; USABLE_LINES],
     hw: Option<T>,
     attr: Attr,
     pos: Position,
@@ -417,6 +423,7 @@ where
                     double_height: DoubleHeightMode::Normal,
                     glyphs: [(Char::Null, DEFAULT_ATTR); TEXT_NUM_COLS],
                 }; TEXT_NUM_ROWS + 1],
+                roller_buffer: [0; USABLE_LINES],
                 hw: None,
                 pos: Position {
                     row: Row(0),
@@ -444,6 +451,9 @@ where
             PIXEL_CLOCK,
         );
         self.hw = Some(hw);
+        for (idx, line) in self.roller_buffer.iter_mut().enumerate() {
+            *line = idx as u16;
+        }
         self.clear();
     }
 
@@ -507,6 +517,14 @@ where
             Some((mode2.buffer, mode2.start))
         } else {
             None
+        }
+    }
+
+    pub fn map_line(&mut self, visible_line: u16, rendered_line: u16) {
+        if (rendered_line as usize) < USABLE_LINES {
+            if let Some(n) = self.roller_buffer.get_mut(visible_line as usize) {
+                *n = rendered_line;
+            }
         }
     }
 
@@ -588,7 +606,8 @@ where
     /// Converts each glyph into 8 pixels, then pushes them out as RGB
     /// triplets to the callback function (to be buffered).
     fn calculate_pixels(&mut self) {
-        let line = self.line_no.load(Ordering::Relaxed) - V_DATA_FIRST;
+        let real_line = self.line_no.load(Ordering::Relaxed) - V_DATA_FIRST;
+        let line = self.roller_buffer[real_line as usize] as usize;
         let text_row = line / MAX_FONT_HEIGHT;
         let row = &self.text_buffer[text_row];
         let font_row = match row.double_height {
@@ -691,6 +710,22 @@ where
             if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
                 self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
                     (glyph, attr.unwrap_or(self.attr));
+            }
+        }
+    }
+
+    /// Read a glyph on screen at the specified place
+    pub fn read_glyph_at(&mut self, pos: Position) -> Option<(Char, Attr)> {
+        if self.cursor_visible && (pos.row == self.pos.row) && (pos.col == self.pos.col) {
+            Some((
+                self.under_cursor,
+                self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize].1,
+            ))
+        } else {
+            if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
+                Some(self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize])
+            } else {
+                None
             }
         }
     }
