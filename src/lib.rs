@@ -597,6 +597,7 @@ where
     /// triplets to the callback function (to be buffered).
     fn calculate_pixels(&mut self) {
         let real_line = self.line_no.load(Ordering::Relaxed) - V_DATA_FIRST;
+        let line = real_line; // No mapping here
         let text_row = line / MAX_FONT_HEIGHT;
         let row = &self.text_buffer[text_row];
         let font_row = match row.double_height {
