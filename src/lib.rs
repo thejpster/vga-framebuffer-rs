@@ -118,11 +118,19 @@ pub const MODE2_USABLE_LINES: usize = 288;
 
 // See http://tinyvga.com/vga-timing/800x600@60Hz
 // These values have been adjusted to assume a 20 MHz pixel clock
-const H_VISIBLE_AREA: u32 = 400;
-const H_FRONT_PORCH: u32 = 20;
-const H_SYNC_PULSE: u32 = 64;
-const H_BACK_PORCH: u32 = 44;
-const H_WHOLE_LINE: u32 = H_VISIBLE_AREA + H_FRONT_PORCH + H_SYNC_PULSE + H_BACK_PORCH;
+const H_VISIBLE_AREA_20MHZ: u32 = 400;
+const H_FRONT_PORCH_20MHZ: u32 = 20;
+const H_SYNC_PULSE_20MHZ: u32 = 64;
+const H_BACK_PORCH_20MHZ: u32 = 44;
+const H_WHOLE_LINE_20MHZ: u32 =
+    H_VISIBLE_AREA_20MHZ + H_FRONT_PORCH_20MHZ + H_SYNC_PULSE_20MHZ + H_BACK_PORCH_20MHZ;
+// These values have been adjusted to assume a 40 MHz pixel clock
+// const H_VISIBLE_AREA_40MHZ: u32 = 800;
+// const H_FRONT_PORCH_40MHZ: u32 = 40;
+// const H_SYNC_PULSE_40MHZ: u32 = 128;
+// const H_BACK_PORCH_40MHZ: u32 = 88;
+// const H_WHOLE_LINE_40MHZ: u32 =
+//     H_VISIBLE_AREA_40MHZ + H_FRONT_PORCH_40MHZ + H_SYNC_PULSE_40MHZ + H_BACK_PORCH_40MHZ;
 const V_VISIBLE_AREA: usize = 600;
 const V_FRONT_PORCH: usize = 1;
 const V_SYNC_PULSE: usize = 4;
@@ -142,8 +150,6 @@ const V_DATA_LAST: usize = V_BOTTOM_BORDER_FIRST - 1;
 const V_BOTTOM_BORDER_FIRST: usize = V_DATA_FIRST + (MAX_FONT_HEIGHT * MODE0_TEXT_NUM_ROWS);
 const V_BOTTOM_BORDER_LAST: usize = V_FRONT_PORCH_FIRST - 1;
 const V_FRONT_PORCH_FIRST: usize = V_BOTTOM_BORDER_FIRST + V_BOTTOM_BORDER;
-
-const PIXEL_CLOCK: u32 = 20_000_000;
 
 // White on Blue
 const DEFAULT_ATTR: Attr = Attr::new(Colour::White, Colour::Blue);
@@ -177,15 +183,7 @@ pub trait Hardware {
     /// V-Sync is controlled by the current line number; you should implement
     /// `vsync_on` and `vsync_off` which this code will call at the
     /// appropriate time.
-    ///
-    /// * `width` - length of a line (in `clock_rate` pixels)
-    /// * `sync_end` - elapsed time (in `clock_rate` pixels) before H-Sync
-    ///   needs to fall
-    /// * `line_start` - elapsed time (in `clock_rate` pixels) before
-    ///   line_start ISR needs to fire
-    /// * `clock_rate` - the pixel clock rate in Hz (e.g. 40_000_000 for 40
-    ///   MHz)
-    fn configure(&mut self, width: u32, sync_end: u32, line_start: u32, clock_rate: u32);
+    fn configure(&mut self, mode_info: &ModeInfo);
 
     /// Called when V-Sync needs to be high.
     fn vsync_on(&mut self);
@@ -216,6 +214,26 @@ trait VideoMode {
 // Public Types
 //
 // ***************************************************************************
+
+/// Describes a video mode.
+#[derive(Debug)]
+pub struct ModeInfo {
+    /// Number of pixels in a line (including blanking)
+    pub width: u32,
+    /// Number of pixels in a line (excluding blanking)
+    pub visible_width: u32,
+    /// Elapsed time (in `clock_rate` pixels) before H-Sync needs to fall
+    pub sync_end: u32,
+    /// Elapsed time (in `clock_rate` pixels) before line_start ISR needs to
+    /// fire
+    pub line_start: u32,
+    /// The pixel clock rate in Hz (e.g. 40_000_000 for 40 MHz)
+    pub clock_rate: u32,
+    /// Number of lines on the screen (including blanking)
+    pub num_lines: u32,
+    /// Number of lines on the screen (excluding blanking)
+    pub visible_lines: u32,
+}
 
 /// This structure represents the framebuffer - a 2D array of monochome pixels.
 ///
@@ -343,12 +361,26 @@ where
     pub fn init(&mut self, mut hw: T) {
         // This all assumes an 8-pixel font (i.e. 1 byte or two per u16)
         assert_eq!(MAX_FONT_WIDTH, 8);
-        hw.configure(
-            H_WHOLE_LINE,
-            H_SYNC_PULSE,
-            H_SYNC_PULSE + H_BACK_PORCH,
-            PIXEL_CLOCK,
-        );
+        let mode_info = ModeInfo {
+            /// Number of pixels in a line (including blanking)
+            width: H_WHOLE_LINE_20MHZ,
+            /// Number of pixels in a line (excluding blanking)
+            visible_width: H_VISIBLE_AREA_20MHZ,
+            /// Elapsed time (in `clock_rate` pixels) before H-Sync needs to
+            /// fall
+            sync_end: H_SYNC_PULSE_20MHZ,
+            /// Elapsed time (in `clock_rate` pixels) before line_start ISR
+            /// needs to fire
+            line_start: H_SYNC_PULSE_20MHZ + H_BACK_PORCH_20MHZ,
+            /// The pixel clock rate in Hz (e.g. 40_000_000 for 40 MHz)
+            clock_rate: 20_000_000,
+            /// Number of lines on the screen (including blanking)
+            num_lines: V_WHOLE_FRAME as u32,
+            /// Number of lines on the screen (excluding blanking)
+            visible_lines: V_VISIBLE_AREA as u32,
+        };
+
+        hw.configure(&mode_info);
         self.hw = Some(hw);
         for (idx, line) in self.roller_buffer.iter_mut().enumerate() {
             *line = idx as u16;

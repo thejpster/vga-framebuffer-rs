@@ -1,7 +1,7 @@
 extern crate term;
 extern crate vga_framebuffer;
 
-use vga_framebuffer::{AsciiConsole, Attr, Col, Colour, Position, Row, XRGBColour};
+use vga_framebuffer::{AsciiConsole, Attr, Col, Colour, ModeInfo, Position, Row, XRGBColour};
 
 mod rust_logo;
 
@@ -11,11 +11,8 @@ struct Dummy {
 }
 
 impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
-    fn configure(&mut self, width: u32, sync_end: u32, line_start: u32, clock_rate: u32) {
-        println!(
-            "width={}, sync_end={}, line_start={}, clock_rate={}",
-            width, sync_end, line_start, clock_rate
-        );
+    fn configure(&mut self, mode_info: &ModeInfo) {
+        println!("{:?}", mode_info);
     }
 
     /// Called when V-Sync needs to be high.
