@@ -50,19 +50,71 @@
 #![no_std]
 #![cfg_attr(feature = "const_fn", feature(const_fn))]
 
+// ***************************************************************************
+//
+// External Crates
+//
+// ***************************************************************************
+
 extern crate console_traits;
 #[macro_use]
 extern crate const_ft;
+
+// ***************************************************************************
+//
+// Sub-modules
+//
+// ***************************************************************************
 
 mod charset;
 pub mod freebsd_cp850;
 pub mod freebsd_teletext;
 mod maps;
 
+// ***************************************************************************
+//
+// Imports
+//
+// ***************************************************************************
+
 pub use charset::*;
 pub use console_traits::*;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use maps::RGB_MAPS;
+
+// ***************************************************************************
+//
+// Public Constants
+//
+// ***************************************************************************
+
+/// Number of lines in frame buffer
+pub const MODE0_USABLE_LINES: usize = 576;
+/// Number of columns in frame buffer
+pub const MODE0_USABLE_COLS: usize = 384;
+/// How many words in a line (including the border)
+pub const MODE0_HORIZONTAL_OCTETS: usize = 50;
+/// How many words in a line (excluding the border)
+pub const MODE0_USABLE_HORIZONTAL_OCTETS: usize = 48;
+/// How many characters in a row
+pub const MODE0_TEXT_NUM_COLS: usize = MODE0_USABLE_COLS / MAX_FONT_WIDTH;
+/// Highest X co-ord for text
+pub const MODE0_TEXT_MAX_COL: usize = MODE0_TEXT_NUM_COLS - 1;
+/// How many rows of characters on the screen
+pub const MODE0_TEXT_NUM_ROWS: usize = MODE0_USABLE_LINES / MAX_FONT_HEIGHT;
+/// Highest Y co-ord for text
+pub const MODE0_TEXT_MAX_ROW: usize = MODE0_TEXT_NUM_ROWS - 1;
+
+/// Number of pixels in a scan-line in Mode 2
+pub const MODE2_WIDTH_PIXELS: usize = 384;
+/// Number of scan-lines in an image in Mode 2. Note, we print each one twice.
+pub const MODE2_USABLE_LINES: usize = 288;
+
+// ***************************************************************************
+//
+// Private Constants
+//
+// ***************************************************************************
 
 // See http://tinyvga.com/vga-timing/800x600@60Hz
 // These values have been adjusted to assume a 20 MHz pixel clock
@@ -87,41 +139,22 @@ const V_TOP_BORDER_FIRST: usize = V_BACK_PORCH_FIRST + V_BACK_PORCH;
 const V_TOP_BORDER_LAST: usize = V_DATA_FIRST - 1;
 const V_DATA_FIRST: usize = V_TOP_BORDER_FIRST + V_TOP_BORDER;
 const V_DATA_LAST: usize = V_BOTTOM_BORDER_FIRST - 1;
-const V_BOTTOM_BORDER_FIRST: usize = V_DATA_FIRST + (MAX_FONT_HEIGHT * TEXT_NUM_ROWS);
+const V_BOTTOM_BORDER_FIRST: usize = V_DATA_FIRST + (MAX_FONT_HEIGHT * MODE0_TEXT_NUM_ROWS);
 const V_BOTTOM_BORDER_LAST: usize = V_FRONT_PORCH_FIRST - 1;
 const V_FRONT_PORCH_FIRST: usize = V_BOTTOM_BORDER_FIRST + V_BOTTOM_BORDER;
 
 const PIXEL_CLOCK: u32 = 20_000_000;
 
-/// Top/bottom border height
-pub const TOP_BOTTOM_BORDER_HEIGHT: usize = 12;
-// How many pixels in the left and right borders
-pub const LEFT_RIGHT_BORDER_WIDTH: usize = 8;
+// White on Blue
+const DEFAULT_ATTR: Attr = Attr::new(Colour::White, Colour::Blue);
 
-/// Number of lines in frame buffer
-pub const USABLE_LINES: usize = 576;
-/// Number of lines in the mode2 frame buffer (which is line-doubled)
-pub const USABLE_LINES_MODE2: usize = 288;
-/// Number of columns in frame buffer
-pub const USABLE_COLS: usize = 384;
-/// Highest Y co-ord
-pub const MAX_Y: usize = USABLE_LINES - 1;
-/// Highest X co-ord
-pub const MAX_X: usize = USABLE_COLS - 1;
+const CURSOR: Char = Char::LowLine;
 
-/// How many words in a line (including the border)
-pub const HORIZONTAL_OCTETS: usize = 50;
-/// How many words in a line (excluding the border)
-pub const USABLE_HORIZONTAL_OCTETS: usize = 48;
-
-/// How many characters in a row
-pub const TEXT_NUM_COLS: usize = USABLE_COLS / MAX_FONT_WIDTH;
-/// Highest X co-ord for text
-pub const TEXT_MAX_COL: usize = TEXT_NUM_COLS - 1;
-/// How many rows of characters on the screen
-pub const TEXT_NUM_ROWS: usize = USABLE_LINES / MAX_FONT_HEIGHT;
-/// Highest Y co-ord for text
-pub const TEXT_MAX_ROW: usize = TEXT_NUM_ROWS - 1;
+// ***************************************************************************
+//
+// Public Traits
+//
+// ***************************************************************************
 
 /// Implement this on your microcontroller's timer object.
 pub trait Hardware {
@@ -164,24 +197,52 @@ pub trait Hardware {
     fn write_pixels(&mut self, xrgb: XRGBColour);
 }
 
-/// A point on the screen.
-/// The arguments are X (column), Y (row)
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub struct Point(pub usize, pub usize);
+// ***************************************************************************
+//
+// Private Traits
+//
+// ***************************************************************************
 
-/// You can set this on a row to make the text double-height. This was common
-/// on the BBC Micro in Mode 7/Teletext mode.
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-pub enum DoubleHeightMode {
-    Normal,
-    Top,
-    Bottom,
+/// Describes the parameters for a particular video mode.
+trait VideoMode {
+    /// How many octets wide is a given scan-line.
+    fn octets(&self) -> usize;
+    /// How many pixels per second are in the video stream?
+    fn clock_speed(&self) -> u32;
 }
 
-#[derive(Copy, Clone)]
-pub struct TextRow {
-    pub double_height: DoubleHeightMode,
-    pub glyphs: [(Char, Attr); TEXT_NUM_COLS],
+// ***************************************************************************
+//
+// Public Types
+//
+// ***************************************************************************
+
+/// This structure represents the framebuffer - a 2D array of monochome pixels.
+///
+/// The framebuffer is stored as an array of horizontal lines, where each line
+/// is comprised of 8 bit words. This suits our timing needs as although the
+/// SPI peripheral on an LM4F120 which can emit 16 bits at a time, 8 proves
+/// easier to work with.
+#[repr(C)]
+pub struct FrameBuffer<T>
+where
+    T: Hardware,
+{
+    line_no: AtomicUsize,
+    frame: usize,
+    // Add one extra row because 600 doesn't divide by 16
+    text_buffer: [Mode0TextRow; MODE0_TEXT_NUM_ROWS + 1],
+    // Allows us to map any visible line to any other visible line.
+    roller_buffer: [u16; MODE0_USABLE_LINES],
+    hw: Option<T>,
+    attr: Attr,
+    pos: Position,
+    mode: ControlCharMode,
+    escape_mode: EscapeCharMode,
+    mode2: Option<Mode2>,
+    font: Option<*const u8>,
+    cursor_visible: bool,
+    under_cursor: Char,
 }
 
 /// This structure describes the attributes for a Char.
@@ -201,150 +262,67 @@ pub enum Colour {
     Black = 0,
 }
 
-impl Colour {
-    /// Generate 8 pixels in RGB which are all this colour
-    pub fn into_pixels(self) -> XRGBColour {
-        match self {
-            Colour::White => XRGBColour::new(0xFF, 0xFF, 0xFF),
-            Colour::Yellow => XRGBColour::new(0xFF, 0xFF, 0x00),
-            Colour::Magenta => XRGBColour::new(0xFF, 0x00, 0xFF),
-            Colour::Red => XRGBColour::new(0xFF, 0x00, 0x00),
-            Colour::Cyan => XRGBColour::new(0x00, 0xFF, 0xFF),
-            Colour::Green => XRGBColour::new(0x00, 0xFF, 0x00),
-            Colour::Blue => XRGBColour::new(0x00, 0x00, 0xFF),
-            Colour::Black => XRGBColour::new(0x00, 0x00, 0x00),
-        }
-    }
-}
-
 /// Represents 8 pixels, each of which can be any 3-bit RGB colour
 #[derive(Debug, Copy, Clone)]
 pub struct XRGBColour(pub u32);
 
-impl XRGBColour {
-    /// Create a new block of 8 coloured pixels by mixing 8 red/black pixels,
-    /// 8 green/black pixels and 8 blue/black pixels.
-    pub const fn new(red: u8, green: u8, blue: u8) -> XRGBColour {
-        XRGBColour(((red as u32) << 16) | ((green as u32) << 8) | (blue as u32))
-    }
-
-    /// Get the 8 red/black pixels in the bottom 8 bits
-    pub const fn red(self) -> u32 {
-        (self.0 >> 16) & 0xFF
-    }
-
-    /// Get the 8 green/black pixels in the bottom 8 bits
-    pub const fn green(self) -> u32 {
-        (self.0 >> 8) & 0xFF
-    }
-
-    /// Get the 8 blue/black pixels in the bottom 8 bits
-    pub const fn blue(self) -> u32 {
-        self.0 & 0xFF
-    }
-
-    /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
-    pub const fn pixel_has_red(self, pixel: u8) -> bool {
-        ((self.0 >> (16 + (7 - pixel))) & 1) == 1
-    }
-
-    /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
-    pub const fn pixel_has_green(self, pixel: u8) -> bool {
-        ((self.0 >> (8 + (7 - pixel))) & 1) == 1
-    }
-
-    /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
-    pub const fn pixel_has_blue(self, pixel: u8) -> bool {
-        ((self.0 >> (7 - pixel)) & 1) == 1
-    }
-}
-
-impl Attr {
-    const FG_BITS: u8 = 0b0011_1000;
-    const BG_BITS: u8 = 0b0000_0111;
-
-    const_ft! {
-        pub fn new(fg: Colour, bg: Colour) -> Attr {
-            Attr(((fg as u8) << 3) + (bg as u8))
-        }
-    }
-
-    pub fn set_fg(&mut self, fg: Colour) -> &mut Attr {
-        self.0 = ((fg as u8) << 3) + (self.0 & !Self::FG_BITS);
-        self
-    }
-
-    pub fn set_bg(&mut self, bg: Colour) -> &mut Attr {
-        self.0 = (self.0 & !Self::BG_BITS) + (bg as u8);
-        self
-    }
-
-    pub fn as_u8(self) -> u8 {
-        self.0
-    }
-}
-
-// White on Blue
-const DEFAULT_ATTR: Attr = Attr((7 * 8) + 1);
-
-const CURSOR: Char = Char::LowLine;
-
-impl core::default::Default for Attr {
-    fn default() -> Self {
-        DEFAULT_ATTR
-    }
-}
-
 /// Represents Mode2 1-bpp graphics
-pub struct Mode2<'a> {
-    buffer: &'a mut [u8],
+pub struct Mode2 {
+    buffer: *const u8,
     start: usize,
     end: usize,
 }
 
-/// This structure represents the framebuffer - a 2D array of monochome pixels.
-///
-/// The framebuffer is stored as an array of horizontal lines, where each line
-/// is comprised of 8 bit words. This suits our timing needs as although the
-/// SPI peripheral on an LM4F120 which can emit 16 bits at a time, 8 proves
-/// easier to work with.
-#[repr(C)]
-pub struct FrameBuffer<'a, T>
-where
-    T: Hardware,
-{
-    line_no: AtomicUsize,
-    frame: usize,
-    // Add one extra row because 600 doesn't divide by 16
-    text_buffer: [TextRow; TEXT_NUM_ROWS + 1],
-    // Allows us to map any visible line to any other visible line.
-    roller_buffer: [u16; USABLE_LINES],
-    hw: Option<T>,
-    attr: Attr,
-    pos: Position,
-    mode: ControlCharMode,
-    escape_mode: EscapeCharMode,
-    mode2: Option<Mode2<'a>>,
-    font: Option<*const u8>,
-    cursor_visible: bool,
-    under_cursor: Char,
+/// A point on the screen.
+/// The arguments are X (column), Y (row)
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Point(pub usize, pub usize);
+
+/// You can set this on a row to make the text double-height. This was common
+/// on the BBC Micro in Mode 7/Teletext mode.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum DoubleHeightMode {
+    Normal,
+    Top,
+    Bottom,
 }
 
-impl<'a, T> FrameBuffer<'a, T>
+#[derive(Copy, Clone)]
+pub struct Mode0TextRow {
+    pub double_height: DoubleHeightMode,
+    pub glyphs: [(Char, Attr); MODE0_TEXT_NUM_COLS],
+}
+
+// ***************************************************************************
+//
+// Private Types
+//
+// ***************************************************************************
+
+// None
+
+// ***************************************************************************
+//
+// Impl for Public Types
+//
+// ***************************************************************************
+
+impl<T> FrameBuffer<T>
 where
     T: Hardware,
 {
-    /// Create a new FrameBuffer
+    /// Create a new FrameBuffer.
     const_ft! {
-        pub fn new() -> FrameBuffer<'a, T> {
+        // We can't use `pub const` as const-fn isn't supported with generics.
+        pub fn new() -> FrameBuffer<T> {
             FrameBuffer {
                 line_no: AtomicUsize::new(0),
                 frame: 0,
-                text_buffer: [TextRow {
+                text_buffer: [Mode0TextRow {
                     double_height: DoubleHeightMode::Normal,
-                    glyphs: [(Char::Null, DEFAULT_ATTR); TEXT_NUM_COLS],
-                }; TEXT_NUM_ROWS + 1],
-                roller_buffer: [0; USABLE_LINES],
+                    glyphs: [(Char::Null, DEFAULT_ATTR); MODE0_TEXT_NUM_COLS],
+                }; MODE0_TEXT_NUM_ROWS + 1],
+                roller_buffer: [0; MODE0_USABLE_LINES],
                 hw: None,
                 pos: Position {
                     row: Row(0),
@@ -356,7 +334,7 @@ where
                 mode2: None,
                 font: None,
                 cursor_visible: true,
-                under_cursor: Char::Space
+                under_cursor: Char::Space,
             }
         }
     }
@@ -409,13 +387,13 @@ where
 
     /// Enable mode2 - a 1-bit-per-pixel graphical buffer which is coloured
     /// according to the colour attributes for the matching text cells.
-    /// Supply a u8 slice that is some multiple of USABLE_HORIZONTAL_OCTETS long.
+    /// Supply a u8 slice that is some multiple of MODE0_USABLE_HORIZONTAL_OCTETS long.
     /// The buffer will be line-doubled and so can be up to 288 lines long.
-    pub fn mode2(&mut self, buffer: &'a mut [u8], start_line: usize) {
+    pub fn mode2(&mut self, buffer: &[u8], start_line: usize) {
         let length = buffer.len();
-        let buffer_lines = length / USABLE_HORIZONTAL_OCTETS;
+        let buffer_lines = length / MODE0_USABLE_HORIZONTAL_OCTETS;
         let mode2 = Mode2 {
-            buffer,
+            buffer: buffer.as_ptr(),
             start: start_line,
             // Framebuffer is line-doubled
             end: start_line + (2 * buffer_lines),
@@ -431,18 +409,13 @@ where
 
     /// Releases the memory for mode2. The rendering code may keep
     /// reading this memory buffer up until the end of the frame.
-    pub fn mode2_release(&mut self) -> Option<(&'a mut [u8], usize)> {
+    pub fn mode2_release(&mut self) {
         let mut mode2_opt = None;
         core::mem::swap(&mut self.mode2, &mut mode2_opt);
-        if let Some(mode2) = mode2_opt {
-            Some((mode2.buffer, mode2.start))
-        } else {
-            None
-        }
     }
 
     pub fn map_line(&mut self, visible_line: u16, rendered_line: u16) {
-        if (rendered_line as usize) < USABLE_LINES {
+        if (rendered_line as usize) < MODE0_USABLE_LINES {
             if let Some(n) = self.roller_buffer.get_mut(visible_line as usize) {
                 *n = rendered_line;
             }
@@ -516,7 +489,7 @@ where
     fn solid_line(&mut self) {
         if let Some(ref mut hw) = self.hw {
             // Middle bit
-            for _ in 0..HORIZONTAL_OCTETS {
+            for _ in 0..MODE0_HORIZONTAL_OCTETS {
                 hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
             }
         }
@@ -536,31 +509,33 @@ where
             DoubleHeightMode::Top => (line % MAX_FONT_HEIGHT) / 2,
             DoubleHeightMode::Bottom => ((line % MAX_FONT_HEIGHT) + MAX_FONT_HEIGHT) / 2,
         };
-        let font_table = self.font.unwrap_or(freebsd_cp850::FONT_DATA.as_ptr());
+        let font_table = self
+            .font
+            .unwrap_or_else(|| freebsd_cp850::FONT_DATA.as_ptr());
         if let Some(ref mut hw) = self.hw {
             // Left border
             hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
 
             let mut need_text = true;
             if let Some(mode2) = self.mode2.as_ref() {
-                if line >= mode2.start && line < mode2.end && text_row < TEXT_NUM_ROWS {
+                if line >= mode2.start && line < mode2.end && text_row < MODE0_TEXT_NUM_ROWS {
                     // Pixels in the middle
 
                     // Our framebuffer is line-doubled
                     let framebuffer_line = (line - mode2.start) >> 1;
 
                     // Find the block of bytes for this scan-line
-                    let start = framebuffer_line * USABLE_HORIZONTAL_OCTETS;
-                    let framebuffer_bytes =
-                        &mode2.buffer[start..(start + USABLE_HORIZONTAL_OCTETS)];
+                    let start = framebuffer_line * MODE0_USABLE_HORIZONTAL_OCTETS;
+                    let framebuffer_offsets = (start as isize)
+                        ..(start as isize + MODE0_USABLE_HORIZONTAL_OCTETS as isize);
 
                     // Write out the bytes with colour from the text-buffer
-                    for ((_, attr), bitmap) in self.text_buffer[text_row]
+                    for ((_, attr), framebuffer_offset) in self.text_buffer[text_row]
                         .glyphs
                         .iter()
-                        .zip(framebuffer_bytes.iter())
+                        .zip(framebuffer_offsets)
                     {
-                        let w = *bitmap;
+                        let w = unsafe { *mode2.buffer.offset(framebuffer_offset) };
                         // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
                         // Each row is 4 bytes. The row index is
                         // 0bFFFBBBPPPPPPPP, where F = foreground, B =
@@ -579,7 +554,7 @@ where
 
             if need_text {
                 // Characters in the middle
-                let font_table = unsafe { font_table.offset(font_row as isize) };
+                let font_table = unsafe { font_table.add(font_row) };
                 for (ch, attr) in row.glyphs.iter() {
                     let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
                     let mono_pixels = unsafe { *font_table.offset(index) };
@@ -632,11 +607,9 @@ where
             self.under_cursor = glyph;
             self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize].1 =
                 attr.unwrap_or(self.attr);
-        } else {
-            if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
-                self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
-                    (glyph, attr.unwrap_or(self.attr));
-            }
+        } else if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
+            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
+                (glyph, attr.unwrap_or(self.attr));
         }
     }
 
@@ -647,12 +620,10 @@ where
                 self.under_cursor,
                 self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize].1,
             ))
+        } else if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
+            Some(self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize])
         } else {
-            if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
-                Some(self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize])
-            } else {
-                None
-            }
+            None
         }
     }
 
@@ -704,7 +675,7 @@ where
     }
 }
 
-impl<'a, T> BaseConsole for FrameBuffer<'a, T>
+impl<T> BaseConsole for FrameBuffer<T>
 where
     T: Hardware,
 {
@@ -712,12 +683,12 @@ where
 
     /// Gets the last col on the screen.
     fn get_width(&self) -> Col {
-        Col(TEXT_MAX_COL as u8)
+        Col(MODE0_TEXT_MAX_COL as u8)
     }
 
     /// Gets the last row on the screen.
     fn get_height(&self) -> Row {
-        Row(TEXT_MAX_ROW as u8)
+        Row(MODE0_TEXT_MAX_ROW as u8)
     }
 
     /// Set the horizontal position for the next text output.
@@ -788,10 +759,10 @@ where
     fn scroll_screen(&mut self) -> Result<(), Self::Error> {
         let old_cursor = self.cursor_visible;
         self.set_cursor_visible(false);
-        for line in 0..TEXT_NUM_ROWS - 1 {
+        for line in 0..MODE0_TEXT_NUM_ROWS - 1 {
             self.text_buffer[line] = self.text_buffer[line + 1];
         }
-        for slot in self.text_buffer[TEXT_MAX_ROW].glyphs.iter_mut() {
+        for slot in self.text_buffer[MODE0_TEXT_MAX_ROW].glyphs.iter_mut() {
             *slot = (Char::Space, self.attr);
         }
         self.set_cursor_visible(old_cursor);
@@ -799,7 +770,7 @@ where
     }
 }
 
-impl<'a, T> AsciiConsole for FrameBuffer<'a, T>
+impl<T> AsciiConsole for FrameBuffer<T>
 where
     T: Hardware,
 {
@@ -880,17 +851,15 @@ where
         if self.cursor_visible && (pos.row == self.pos.row) && (pos.col == self.pos.col) {
             self.under_cursor = Char::from_byte(ch);
             self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize].1 = self.attr;
-        } else {
-            if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
-                self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
-                    (Char::from_byte(ch), self.attr);
-            }
+        } else if (pos.col <= self.get_width()) && (pos.row <= self.get_height()) {
+            self.text_buffer[pos.row.0 as usize].glyphs[pos.col.0 as usize] =
+                (Char::from_byte(ch), self.attr);
         }
         Ok(())
     }
 }
 
-impl<'a, T> core::fmt::Write for FrameBuffer<'a, T>
+impl<T> core::fmt::Write for FrameBuffer<T>
 where
     T: Hardware,
 {
@@ -903,4 +872,109 @@ where
     }
 }
 
-// End of file
+impl Attr {
+    const FG_BITS: u8 = 0b0011_1000;
+    const BG_BITS: u8 = 0b0000_0111;
+
+    pub const fn new(fg: Colour, bg: Colour) -> Attr {
+        Attr(((fg as u8) << 3) + (bg as u8))
+    }
+
+    pub fn set_fg(&mut self, fg: Colour) -> &mut Attr {
+        self.0 = ((fg as u8) << 3) + (self.0 & !Self::FG_BITS);
+        self
+    }
+
+    pub fn set_bg(&mut self, bg: Colour) -> &mut Attr {
+        self.0 = (self.0 & !Self::BG_BITS) + (bg as u8);
+        self
+    }
+
+    pub fn as_u8(self) -> u8 {
+        self.0
+    }
+}
+
+impl core::default::Default for Attr {
+    fn default() -> Self {
+        DEFAULT_ATTR
+    }
+}
+
+impl Colour {
+    /// Generate 8 pixels in RGB which are all this colour
+    pub fn into_pixels(self) -> XRGBColour {
+        match self {
+            Colour::White => XRGBColour::new(0xFF, 0xFF, 0xFF),
+            Colour::Yellow => XRGBColour::new(0xFF, 0xFF, 0x00),
+            Colour::Magenta => XRGBColour::new(0xFF, 0x00, 0xFF),
+            Colour::Red => XRGBColour::new(0xFF, 0x00, 0x00),
+            Colour::Cyan => XRGBColour::new(0x00, 0xFF, 0xFF),
+            Colour::Green => XRGBColour::new(0x00, 0xFF, 0x00),
+            Colour::Blue => XRGBColour::new(0x00, 0x00, 0xFF),
+            Colour::Black => XRGBColour::new(0x00, 0x00, 0x00),
+        }
+    }
+}
+
+impl XRGBColour {
+    /// Create a new block of 8 coloured pixels by mixing 8 red/black pixels,
+    /// 8 green/black pixels and 8 blue/black pixels.
+    pub const fn new(red: u8, green: u8, blue: u8) -> XRGBColour {
+        XRGBColour(((red as u32) << 16) | ((green as u32) << 8) | (blue as u32))
+    }
+
+    /// Get the 8 red/black pixels in the bottom 8 bits
+    pub const fn red(self) -> u32 {
+        (self.0 >> 16) & 0xFF
+    }
+
+    /// Get the 8 green/black pixels in the bottom 8 bits
+    pub const fn green(self) -> u32 {
+        (self.0 >> 8) & 0xFF
+    }
+
+    /// Get the 8 blue/black pixels in the bottom 8 bits
+    pub const fn blue(self) -> u32 {
+        self.0 & 0xFF
+    }
+
+    /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
+    pub const fn pixel_has_red(self, pixel: u8) -> bool {
+        ((self.0 >> (16 + (7 - pixel))) & 1) == 1
+    }
+
+    /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
+    pub const fn pixel_has_green(self, pixel: u8) -> bool {
+        ((self.0 >> (8 + (7 - pixel))) & 1) == 1
+    }
+
+    /// Pixel must be in the range 0..7, where 0 is the rightmost pixel
+    pub const fn pixel_has_blue(self, pixel: u8) -> bool {
+        ((self.0 >> (7 - pixel)) & 1) == 1
+    }
+}
+
+// ***************************************************************************
+//
+// Impl for Private Types
+//
+// ***************************************************************************
+
+// ***************************************************************************
+//
+// Public Functions
+//
+// ***************************************************************************
+
+// ***************************************************************************
+//
+// Private Functions
+//
+// ***************************************************************************
+
+// ***************************************************************************
+//
+// End of File
+//
+// ***************************************************************************
