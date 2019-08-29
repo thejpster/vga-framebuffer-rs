@@ -57,10 +57,12 @@ extern crate const_ft;
 mod charset;
 pub mod freebsd_cp850;
 pub mod freebsd_teletext;
+mod maps;
 
 pub use charset::*;
 pub use console_traits::*;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use maps::RGB_MAPS;
 
 // See http://tinyvga.com/vga-timing/800x600@60Hz
 // These values have been adjusted to assume a 20 MHz pixel clock
@@ -292,8 +294,6 @@ impl core::default::Default for Attr {
         DEFAULT_ATTR
     }
 }
-
-static RGB_MAPS: [XRGBColour; 256 * 64] = include!("maps.txt");
 
 /// Represents Mode2 1-bpp graphics
 pub struct Mode2<'a> {
