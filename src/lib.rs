@@ -725,41 +725,53 @@ where
 
     /// Set the horizontal position for the next text output.
     fn set_col(&mut self, col: Col) -> Result<(), Self::Error> {
-        if self.cursor_visible {
-            self.current_cell().0 = self.under_cursor;
-            self.pos.col = col;
-            self.under_cursor = self.current_cell().0;
-            self.current_cell().0 = CURSOR;
+        if col <= self.get_width() {
+            if self.cursor_visible {
+                self.current_cell().0 = self.under_cursor;
+                self.pos.col = col;
+                self.under_cursor = self.current_cell().0;
+                self.current_cell().0 = CURSOR;
+            } else {
+                self.pos.col = col;
+            }
+            Ok(())
         } else {
-            self.pos.col = col;
+            Err(())
         }
-        Ok(())
     }
 
     /// Set the vertical position for the next text output.
     fn set_row(&mut self, row: Row) -> Result<(), Self::Error> {
-        if self.cursor_visible {
-            self.current_cell().0 = self.under_cursor;
-            self.pos.row = row;
-            self.under_cursor = self.current_cell().0;
-            self.current_cell().0 = CURSOR;
+        if row <= self.get_height() {
+            if self.cursor_visible {
+                self.current_cell().0 = self.under_cursor;
+                self.pos.row = row;
+                self.under_cursor = self.current_cell().0;
+                self.current_cell().0 = CURSOR;
+            } else {
+                self.pos.row = row;
+            }
+            Ok(())
         } else {
-            self.pos.row = row;
+            Err(())
         }
-        Ok(())
     }
 
     /// Set the horizontal and vertical position for the next text output.
     fn set_pos(&mut self, pos: Position) -> Result<(), Self::Error> {
-        if self.cursor_visible {
-            self.current_cell().0 = self.under_cursor;
-            self.pos = pos;
-            self.under_cursor = self.current_cell().0;
-            self.current_cell().0 = CURSOR;
+        if pos.row <= self.get_height() && pos.col <= self.get_width() {
+            if self.cursor_visible {
+                self.current_cell().0 = self.under_cursor;
+                self.pos = pos;
+                self.under_cursor = self.current_cell().0;
+                self.current_cell().0 = CURSOR;
+            } else {
+                self.pos = pos;
+            }
+            Ok(())
         } else {
-            self.pos = pos;
+            Err(())
         }
-        Ok(())
     }
 
     /// Get the current screen position.
