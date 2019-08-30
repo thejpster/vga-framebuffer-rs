@@ -1,7 +1,7 @@
 extern crate term;
 extern crate vga_framebuffer;
 
-use vga_framebuffer::{XRGBColour, AsciiConsole, Attr, Col, Colour, Position, Row};
+use vga_framebuffer::{AsciiConsole, Attr, Col, Colour, ModeInfo, Position, Row, XRGBColour};
 
 mod rust_logo;
 
@@ -11,11 +11,8 @@ struct Dummy {
 }
 
 impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
-    fn configure(&mut self, width: u32, sync_end: u32, line_start: u32, clock_rate: u32) {
-        println!(
-            "width={}, sync_end={}, line_start={}, clock_rate={}",
-            width, sync_end, line_start, clock_rate
-        );
+    fn configure(&mut self, mode_info: &ModeInfo) {
+        println!("{:?}", mode_info);
     }
 
     /// Called when V-Sync needs to be high.
@@ -68,7 +65,7 @@ impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
             write!(self.output, "█").unwrap();
         }
         self.col += 1;
-        if self.col == vga_framebuffer::HORIZONTAL_OCTETS {
+        if self.col == vga_framebuffer::MODE0_HORIZONTAL_OCTETS {
             self.col = 0;
             println!();
         }
@@ -84,12 +81,12 @@ fn main() {
     };
     let mut mode2_buffer = vec![
         0xAAu8;
-        vga_framebuffer::USABLE_HORIZONTAL_OCTETS
-            * vga_framebuffer::USABLE_LINES_MODE2
+        ((7 + vga_framebuffer::MODE2_WIDTH_PIXELS) / 8)
+            * vga_framebuffer::MODE2_USABLE_LINES
     ];
     let mut fb = vga_framebuffer::FrameBuffer::new();
-    let max_col = Col(vga_framebuffer::TEXT_MAX_COL as u8);
-    let max_row = Row(vga_framebuffer::TEXT_MAX_ROW as u8);
+    let max_col = Col(vga_framebuffer::MODE0_TEXT_MAX_COL as u8);
+    let max_row = Row(vga_framebuffer::MODE0_TEXT_MAX_ROW as u8);
     fb.init(&mut d);
     fb.clear();
     fb.write_char_at(b'$', Position::origin()).unwrap();
@@ -105,8 +102,8 @@ fn main() {
     }
 
     let mut wheel = [Colour::Red, Colour::Green, Colour::Blue].iter().cycle();
-    for y in 0..=vga_framebuffer::TEXT_MAX_ROW {
-        for x in 0..=vga_framebuffer::TEXT_MAX_COL {
+    for y in 0..=vga_framebuffer::MODE0_TEXT_MAX_ROW {
+        for x in 0..=vga_framebuffer::MODE0_TEXT_MAX_COL {
             fb.set_attr_at(
                 Position::new(Row(y as u8), Col(x as u8)),
                 Attr::new(Colour::White, *wheel.next().unwrap()),
@@ -138,7 +135,7 @@ fn main() {
     fb.clear();
 
     fb.set_custom_font(Some(&vga_framebuffer::freebsd_teletext::FONT_DATA));
-
+    fb.set_cursor_visible(false);
     writeln!(fb, "This is teletext").unwrap();
     for ch in 0x80..=0xFF {
         fb.write_char(ch, None);
@@ -149,6 +146,7 @@ fn main() {
     }
 
     fb.set_custom_font(None);
+    fb.set_cursor_visible(true);
 
     fb.clear();
     // You have to put double-height text in twice, once for the top line and once for the bottom line.
