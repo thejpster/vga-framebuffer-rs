@@ -307,7 +307,6 @@ pub enum DoubleHeightMode {
 
 #[derive(Copy, Clone)]
 pub struct Mode0TextRow {
-    pub double_height: DoubleHeightMode,
     pub glyphs: [(Char, Attr); MODE0_TEXT_NUM_COLS],
 }
 
@@ -329,7 +328,7 @@ impl<T> FrameBuffer<T>
 where
     T: Hardware,
 {
-    /// Create a new FrameBuffer.
+    // Create a new FrameBuffer.
     const_ft! {
         // We can't use `pub const` as const-fn isn't supported with generics.
         pub fn new() -> FrameBuffer<T> {
@@ -337,7 +336,6 @@ where
                 line_no: AtomicUsize::new(0),
                 frame: 0,
                 text_buffer: [Mode0TextRow {
-                    double_height: DoubleHeightMode::Normal,
                     glyphs: [(Char::Null, DEFAULT_ATTR); MODE0_TEXT_NUM_COLS],
                 }; MODE0_TEXT_NUM_ROWS + 1],
                 roller_buffer: [0; MODE0_USABLE_LINES],
@@ -536,11 +534,7 @@ where
         let line = self.roller_buffer[real_line as usize] as usize;
         let text_row = line / MAX_FONT_HEIGHT;
         let row = &self.text_buffer[text_row];
-        let font_row = match row.double_height {
-            DoubleHeightMode::Normal => line % MAX_FONT_HEIGHT,
-            DoubleHeightMode::Top => (line % MAX_FONT_HEIGHT) / 2,
-            DoubleHeightMode::Bottom => ((line % MAX_FONT_HEIGHT) + MAX_FONT_HEIGHT) / 2,
-        };
+        let font_row = line % MAX_FONT_HEIGHT;
         let font_table = self
             .font
             .unwrap_or_else(|| freebsd_cp850::FONT_DATA.as_ptr());
@@ -628,7 +622,7 @@ where
             for slot in row.glyphs.iter_mut() {
                 *slot = (Char::Space, self.attr);
             }
-            row.double_height = DoubleHeightMode::Normal;
+            // row.double_height = DoubleHeightMode::Normal;
         }
         self.pos = Position::origin();
     }
@@ -681,13 +675,13 @@ where
     }
 
     /// Change font height for a given line.
-    pub fn set_line_mode_at(&mut self, row: Row, double_height: DoubleHeightMode) {
-        self.text_buffer[row.0 as usize].double_height = double_height;
+    pub fn set_line_mode_at(&mut self, _row: Row, _double_height: DoubleHeightMode) {
+        // self.text_buffer[row.0 as usize].double_height = double_height;
     }
 
     /// Change font height for the current line.
-    pub fn set_line_mode(&mut self, double_height: DoubleHeightMode) {
-        self.text_buffer[self.pos.row.0 as usize].double_height = double_height;
+    pub fn set_line_mode(&mut self, _double_height: DoubleHeightMode) {
+        // self.text_buffer[self.pos.row.0 as usize].double_height = double_height;
     }
 
     /// Change the current character attribute
@@ -700,6 +694,11 @@ where
     /// Get the current character attribute
     pub fn get_attr(&mut self) -> Attr {
         self.attr
+    }
+
+    /// Get the text buffer address. Do not go out of bounds with this pointer!
+    pub fn get_address(&self) -> *mut u8 {
+        self.text_buffer.as_ptr() as *mut _
     }
 
     fn current_cell(&mut self) -> &mut (Char, Attr) {
