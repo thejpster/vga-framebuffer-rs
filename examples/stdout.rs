@@ -1,7 +1,7 @@
 extern crate term;
 extern crate vga_framebuffer;
 
-use vga_framebuffer::{AsciiConsole, Attr, Col, Colour, ModeInfo, Position, Row, XRGBColour};
+use vga_framebuffer::{AsciiConsole, Attr, Col, Colour, Position, Row, XRGBColour};
 
 mod rust_logo;
 
@@ -10,11 +10,7 @@ struct Dummy {
     output: Box<dyn term::Terminal<Output = std::io::Stdout>>,
 }
 
-impl<'a> vga_framebuffer::Hardware for &'a mut Dummy {
-    fn configure(&mut self, mode_info: &ModeInfo) {
-        println!("{:?}", mode_info);
-    }
-
+impl vga_framebuffer::Hardware for Dummy {
     /// Called when V-Sync needs to be high.
     fn vsync_on(&mut self) {
         println!("vsync_on");
@@ -87,7 +83,9 @@ fn main() {
     let mut fb = vga_framebuffer::FrameBuffer::new();
     let max_col = Col(vga_framebuffer::MODE0_TEXT_MAX_COL as u8);
     let max_row = Row(vga_framebuffer::MODE0_TEXT_MAX_ROW as u8);
-    fb.init(&mut d);
+    fb.init(|m| {
+        println!("Configured with {:?}", m);
+    });
     fb.clear();
     fb.write_char_at(b'$', Position::origin()).unwrap();
     fb.write_char_at(b'$', Position::new(max_row, Col::origin()))
@@ -98,7 +96,7 @@ fn main() {
         .unwrap();
     writeln!(fb, "\nThis is a test").unwrap();
     for _ in 0..628 {
-        fb.isr_sol();
+        fb.isr_sol(&mut d);
     }
 
     let mut wheel = [Colour::Red, Colour::Green, Colour::Blue].iter().cycle();
@@ -127,7 +125,7 @@ fn main() {
     fb.mode2(&mut mode2_buffer[..], 0);
 
     for _ in 0..628 {
-        fb.isr_sol();
+        fb.isr_sol(&mut d);
     }
 
     let _ = fb.mode2_release();
@@ -142,7 +140,7 @@ fn main() {
     }
 
     for _ in 0..628 {
-        fb.isr_sol();
+        fb.isr_sol(&mut d);
     }
 
     fb.set_custom_font(None);
@@ -155,7 +153,7 @@ fn main() {
     writeln!(fb, "\u{001b}-\u{001b}k\u{001b}WThis is normal height text").unwrap();
 
     for _ in 0..628 {
-        fb.isr_sol();
+        fb.isr_sol(&mut d);
     }
 }
 

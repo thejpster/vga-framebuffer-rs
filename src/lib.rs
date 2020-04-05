@@ -48,17 +48,6 @@
 //! See https://github.com/thejpster/monotron for an example.
 
 #![no_std]
-#![cfg_attr(feature = "const_fn", feature(const_fn))]
-
-// ***************************************************************************
-//
-// External Crates
-//
-// ***************************************************************************
-
-extern crate console_traits;
-#[macro_use]
-extern crate const_ft;
 
 // ***************************************************************************
 //
@@ -162,29 +151,8 @@ const CURSOR: Char = Char::LowLine;
 //
 // ***************************************************************************
 
-/// Implement this on your microcontroller's timer object.
+/// Implement this for your microcontroller.
 pub trait Hardware {
-    /// Called at start-up to configure timer.
-    ///
-    /// The timer must be periodic, with period `width`, which is measured
-    /// clock ticks (or VGA pixels), assuming the given clock rate. If you
-    /// have a clock that runs at half the given rate, then double the given
-    /// values.
-    ///
-    /// You will receive calls to `write_pixels` as pixels are generated. Do
-    /// not emit any pixels until the `line_start` timer elapses (store them
-    /// in a FIFO).
-    ///
-    /// The H-Sync pin must rise at the start of the loop and fall after
-    /// `sync_end` clock ticks. We don't control it here because that would
-    /// add too much latency - you must change the H-Sync GPIO pin early in
-    /// the ISR yourself.
-    ///
-    /// V-Sync is controlled by the current line number; you should implement
-    /// `vsync_on` and `vsync_off` which this code will call at the
-    /// appropriate time.
-    fn configure(&mut self, mode_info: &ModeInfo);
-
     /// Called when V-Sync needs to be high.
     fn vsync_on(&mut self);
 
@@ -242,17 +210,13 @@ pub struct ModeInfo {
 /// SPI peripheral on an LM4F120 which can emit 16 bits at a time, 8 proves
 /// easier to work with.
 #[repr(C)]
-pub struct FrameBuffer<T>
-where
-    T: Hardware,
-{
+pub struct FrameBuffer {
     line_no: AtomicUsize,
     frame: usize,
     // Add one extra row because 600 doesn't divide by 16
     text_buffer: [Mode0TextRow; MODE0_TEXT_NUM_ROWS + 1],
     // Allows us to map any visible line to any other visible line.
     roller_buffer: [u16; MODE0_USABLE_LINES],
-    hw: Option<T>,
     attr: Attr,
     pos: Position,
     mode: ControlCharMode,
@@ -324,39 +288,35 @@ pub struct Mode0TextRow {
 //
 // ***************************************************************************
 
-impl<T> FrameBuffer<T>
-where
-    T: Hardware,
-{
+impl FrameBuffer {
     // Create a new FrameBuffer.
-    const_ft! {
-        // We can't use `pub const` as const-fn isn't supported with generics.
-        pub fn new() -> FrameBuffer<T> {
-            FrameBuffer {
-                line_no: AtomicUsize::new(0),
-                frame: 0,
-                text_buffer: [Mode0TextRow {
-                    glyphs: [(Char::Null, DEFAULT_ATTR); MODE0_TEXT_NUM_COLS],
-                }; MODE0_TEXT_NUM_ROWS + 1],
-                roller_buffer: [0; MODE0_USABLE_LINES],
-                hw: None,
-                pos: Position {
-                    row: Row(0),
-                    col: Col(0),
-                },
-                attr: DEFAULT_ATTR,
-                mode: ControlCharMode::Interpret,
-                escape_mode: EscapeCharMode::Waiting,
-                mode2: None,
-                font: None,
-                cursor_visible: true,
-                under_cursor: Char::Space,
-            }
+    pub const fn new() -> FrameBuffer {
+        FrameBuffer {
+            line_no: AtomicUsize::new(0),
+            frame: 0,
+            text_buffer: [Mode0TextRow {
+                glyphs: [(Char::Null, DEFAULT_ATTR); MODE0_TEXT_NUM_COLS],
+            }; MODE0_TEXT_NUM_ROWS + 1],
+            roller_buffer: [0; MODE0_USABLE_LINES],
+            pos: Position {
+                row: Row(0),
+                col: Col(0),
+            },
+            attr: DEFAULT_ATTR,
+            mode: ControlCharMode::Interpret,
+            escape_mode: EscapeCharMode::Waiting,
+            mode2: None,
+            font: None,
+            cursor_visible: true,
+            under_cursor: Char::Space,
         }
     }
 
     /// Initialise the hardware (by calling the `configure` callback).
-    pub fn init(&mut self, mut hw: T) {
+    pub fn init<F>(&mut self, hw_init_callback: F)
+    where
+        F: FnOnce(&ModeInfo),
+    {
         // This all assumes an 8-pixel font (i.e. 1 byte or two per u16)
         assert_eq!(MAX_FONT_WIDTH, 8);
         let mode_info = ModeInfo {
@@ -378,28 +338,11 @@ where
             visible_lines: V_VISIBLE_AREA as u32,
         };
 
-        hw.configure(&mode_info);
-        self.hw = Some(hw);
+        hw_init_callback(&mode_info);
         for (idx, line) in self.roller_buffer.iter_mut().enumerate() {
             *line = idx as u16;
         }
         self.clear();
-    }
-
-    pub fn borrow_hw_mut(&mut self) -> Option<&mut T> {
-        if let Some(x) = &mut self.hw {
-            Some(x)
-        } else {
-            None
-        }
-    }
-
-    pub fn borrow_hw(&self) -> Option<&T> {
-        if let Some(x) = &self.hw {
-            Some(x)
-        } else {
-            None
-        }
     }
 
     pub fn set_cursor_visible(&mut self, visible: bool) {
@@ -480,21 +423,22 @@ where
     }
 
     /// Call this at the start of every line.
-    pub fn isr_sol(&mut self) {
+    pub fn isr_sol<T>(&mut self, hw: &mut T)
+    where
+        T: Hardware,
+    {
         match self.line_no.load(Ordering::Relaxed) {
             V_BOTTOM_BORDER_FIRST..=V_BOTTOM_BORDER_LAST => {
-                self.solid_line();
+                self.solid_line(hw);
             }
             V_TOP_BORDER_FIRST..=V_TOP_BORDER_LAST => {
-                self.solid_line();
+                self.solid_line(hw);
             }
             V_DATA_FIRST..=V_DATA_LAST => {
-                self.calculate_pixels();
+                self.calculate_pixels(hw);
             }
             V_BACK_PORCH_FIRST => {
-                if let Some(ref mut hw) = self.hw {
-                    hw.vsync_off();
-                }
+                hw.vsync_off();
             }
             V_FRONT_PORCH_FIRST => {
                 // End of visible frame - increment counter
@@ -503,9 +447,7 @@ where
             V_WHOLE_FRAME => {
                 // Wrap around
                 self.line_no.store(0, Ordering::Relaxed);
-                if let Some(ref mut hw) = self.hw {
-                    hw.vsync_on();
-                }
+                hw.vsync_on();
             }
             _ => {
                 // No output on this line
@@ -516,12 +458,13 @@ where
 
     /// Calculate a solid line of pixels for the border.
     /// @todo allow the border colour/pattern to be set
-    fn solid_line(&mut self) {
-        if let Some(ref mut hw) = self.hw {
-            // Middle bit
-            for _ in 0..MODE0_HORIZONTAL_OCTETS {
-                hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
-            }
+    fn solid_line<T>(&mut self, hw: &mut T)
+    where
+        T: Hardware,
+    {
+        // Middle bit
+        for _ in 0..MODE0_HORIZONTAL_OCTETS {
+            hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
         }
     }
 
@@ -529,7 +472,10 @@ where
     ///
     /// Converts each glyph into 8 pixels, then pushes them out as RGB
     /// triplets to the callback function (to be buffered).
-    fn calculate_pixels(&mut self) {
+    fn calculate_pixels<T>(&mut self, hw: &mut T)
+    where
+        T: Hardware,
+    {
         let real_line = self.line_no.load(Ordering::Relaxed) - V_DATA_FIRST;
         let line = self.roller_buffer[real_line as usize] as usize;
         let text_row = line / MAX_FONT_HEIGHT;
@@ -538,52 +484,29 @@ where
         let font_table = self
             .font
             .unwrap_or_else(|| freebsd_cp850::FONT_DATA.as_ptr());
-        if let Some(ref mut hw) = self.hw {
-            // Left border
-            hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
+        // Left border
+        hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
 
-            let mut need_text = true;
-            if let Some(mode2) = self.mode2.as_ref() {
-                if line >= mode2.start && line < mode2.end && text_row < MODE0_TEXT_NUM_ROWS {
-                    // Pixels in the middle
+        let mut need_text = true;
+        if let Some(mode2) = self.mode2.as_ref() {
+            if line >= mode2.start && line < mode2.end && text_row < MODE0_TEXT_NUM_ROWS {
+                // Pixels in the middle
 
-                    // Our framebuffer is line-doubled
-                    let framebuffer_line = (line - mode2.start) >> 1;
+                // Our framebuffer is line-doubled
+                let framebuffer_line = (line - mode2.start) >> 1;
 
-                    // Find the block of bytes for this scan-line
-                    let start = framebuffer_line * MODE0_USABLE_HORIZONTAL_OCTETS;
-                    let framebuffer_offsets = (start as isize)
-                        ..(start as isize + MODE0_USABLE_HORIZONTAL_OCTETS as isize);
+                // Find the block of bytes for this scan-line
+                let start = framebuffer_line * MODE0_USABLE_HORIZONTAL_OCTETS;
+                let framebuffer_offsets =
+                    (start as isize)..(start as isize + MODE0_USABLE_HORIZONTAL_OCTETS as isize);
 
-                    // Write out the bytes with colour from the text-buffer
-                    for ((_, attr), framebuffer_offset) in self.text_buffer[text_row]
-                        .glyphs
-                        .iter()
-                        .zip(framebuffer_offsets)
-                    {
-                        let w = unsafe { *mode2.buffer.offset(framebuffer_offset) };
-                        // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
-                        // Each row is 4 bytes. The row index is
-                        // 0bFFFBBBPPPPPPPP, where F = foreground, B =
-                        // background, P = 8-bit pixels.
-                        let rgb_addr = unsafe {
-                            RGB_MAPS
-                                .as_ptr()
-                                .offset(((attr.0 as isize) * 256_isize) + (w as isize))
-                        };
-                        let rgb_word = unsafe { *rgb_addr };
-                        hw.write_pixels(rgb_word);
-                    }
-                    need_text = false;
-                }
-            }
-
-            if need_text {
-                // Characters in the middle
-                let font_table = unsafe { font_table.add(font_row) };
-                for (ch, attr) in row.glyphs.iter() {
-                    let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
-                    let mono_pixels = unsafe { *font_table.offset(index) };
+                // Write out the bytes with colour from the text-buffer
+                for ((_, attr), framebuffer_offset) in self.text_buffer[text_row]
+                    .glyphs
+                    .iter()
+                    .zip(framebuffer_offsets)
+                {
+                    let w = unsafe { *mode2.buffer.offset(framebuffer_offset) };
                     // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
                     // Each row is 4 bytes. The row index is
                     // 0bFFFBBBPPPPPPPP, where F = foreground, B =
@@ -591,16 +514,37 @@ where
                     let rgb_addr = unsafe {
                         RGB_MAPS
                             .as_ptr()
-                            .offset(((attr.0 as isize) * 256_isize) + (mono_pixels as isize))
+                            .offset(((attr.0 as isize) * 256_isize) + (w as isize))
                     };
                     let rgb_word = unsafe { *rgb_addr };
                     hw.write_pixels(rgb_word);
                 }
+                need_text = false;
             }
-
-            // Right border
-            hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
         }
+
+        if need_text {
+            // Characters in the middle
+            let font_table = unsafe { font_table.add(font_row) };
+            for (ch, attr) in row.glyphs.iter() {
+                let index = (*ch as isize) * (MAX_FONT_HEIGHT as isize);
+                let mono_pixels = unsafe { *font_table.offset(index) };
+                // RGB_MAPs is a lookup of (pixels, fg, bg) -> (r,g,b)
+                // Each row is 4 bytes. The row index is
+                // 0bFFFBBBPPPPPPPP, where F = foreground, B =
+                // background, P = 8-bit pixels.
+                let rgb_addr = unsafe {
+                    RGB_MAPS
+                        .as_ptr()
+                        .offset(((attr.0 as isize) * 256_isize) + (mono_pixels as isize))
+                };
+                let rgb_word = unsafe { *rgb_addr };
+                hw.write_pixels(rgb_word);
+            }
+        }
+
+        // Right border
+        hw.write_pixels(XRGBColour::new(0xFF, 0xFF, 0xFF));
     }
 
     /// Change the current font
@@ -706,10 +650,7 @@ where
     }
 }
 
-impl<T> BaseConsole for FrameBuffer<T>
-where
-    T: Hardware,
-{
+impl BaseConsole for FrameBuffer {
     type Error = ();
 
     /// Gets the last col on the screen.
@@ -813,10 +754,7 @@ where
     }
 }
 
-impl<T> AsciiConsole for FrameBuffer<T>
-where
-    T: Hardware,
-{
+impl AsciiConsole for FrameBuffer {
     /// Handle an escape char.
     /// We take a, b, c, d, e, f, g, h as being a background colour and A..H as being a foreground colour.
     /// 'Z' means clear the screen.
@@ -902,10 +840,7 @@ where
     }
 }
 
-impl<T> core::fmt::Write for FrameBuffer<T>
-where
-    T: Hardware,
-{
+impl core::fmt::Write for FrameBuffer {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         for ch in s.chars() {
             self.write_character(Char::map_char(ch) as u8)
